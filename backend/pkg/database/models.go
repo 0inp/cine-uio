@@ -2,8 +2,6 @@ package database
 
 import (
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // CinemaCompany represents a cinema company (e.g., Multicines, Supercines)
