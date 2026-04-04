@@ -1,17 +1,12 @@
 package database
 
-import (
-	"time"
-
-	"gorm.io/gorm"
-)
+import "time"
 
 // BaseModel contains common fields for all database models
 type BaseModel struct {
-	ID        uint           `gorm:"primaryKey"`
-	CreatedAt time.Time      `gorm:"autoCreateTime"`
-	UpdatedAt time.Time      `gorm:"autoUpdateTime"`
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	ID        uint      `gorm:"primaryKey"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
 
 // CinemaCompany represents a cinema company (e.g., Multicines, Supercines)
@@ -46,9 +41,6 @@ type Screening struct {
 	Date     time.Time `gorm:"not null"`
 	Time     string    `gorm:"not null"`
 	Language string    `gorm:"not null"`
-	// Temporary fields for scraping (not stored in DB)
-	MovieTitle string `gorm:"-"`
-	CinemaName string `gorm:"-"`
 }
 
 // TableName overrides for explicit table naming

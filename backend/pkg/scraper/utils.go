@@ -6,9 +6,9 @@ import (
 )
 
 // DeduplicateScreenings removes duplicate screenings based on movie, cinema, date, time, and language
-func DeduplicateScreenings(screenings []database.Screening) []database.Screening {
+func DeduplicateScreenings(screenings []database.ScrapedScreening) []database.ScrapedScreening {
 	seen := make(map[string]bool)
-	var unique []database.Screening
+	var unique []database.ScrapedScreening
 
 	for _, s := range screenings {
 		// Create a unique key for each screening

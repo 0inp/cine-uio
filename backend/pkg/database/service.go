@@ -50,8 +50,15 @@ func GetCinemaCompanyByName(name string) (*CinemaCompany, error) {
 	return &company, nil
 }
 
+// ScrapedScreening represents a screening with movie/cinema names for saving
+type ScrapedScreening struct {
+	Screening
+	MovieTitle string
+	CinemaName string
+}
+
 // SaveScreening saves a screening to the database
-func SaveScreening(screening Screening) error {
+func SaveScreening(screening ScrapedScreening) error {
 	// Get or create movie
 	var movie Movie
 	result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle})
@@ -84,7 +91,7 @@ func SaveScreening(screening Screening) error {
 }
 
 // SaveScreenings saves multiple screenings to the database
-func SaveScreenings(screenings []Screening) error {
+func SaveScreenings(screenings []ScrapedScreening) error {
 	fmt.Printf("💾 Starting to save %d screenings to database...\n", len(screenings))
 
 	if len(screenings) == 0 {
@@ -94,7 +101,12 @@ func SaveScreenings(screenings []Screening) error {
 
 	for i, screening := range screenings {
 		fmt.Printf("📝 Saving screening %d/%d: %s at %s\n", i+1, len(screenings), screening.MovieTitle, screening.CinemaName)
-		err := SaveScreening(screening)
+		scraped := ScrapedScreening{
+			Screening:  screening.Screening,
+			MovieTitle: screening.MovieTitle,
+			CinemaName: screening.CinemaName,
+		}
+		err := SaveScreening(scraped)
 		if err != nil {
 			return fmt.Errorf("failed to save screening for %s: %w", screening.MovieTitle, err)
 		}

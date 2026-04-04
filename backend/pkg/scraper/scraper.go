@@ -28,8 +28,8 @@ func NewScraper(logger *logger.Logger) (*Scraper, context.CancelFunc) {
 	}, cancel
 }
 
-func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema) ([]database.Screening, error) {
-	var screenings []database.Screening
+func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema) ([]database.ScrapedScreening, error) {
+	var screenings []database.ScrapedScreening
 	var err error
 	var doc *goquery.Document
 	var location *time.Location
@@ -142,14 +142,16 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 							language = "Unknown"
 						}
 
-						screening := database.Screening{
-							MovieID:    0, // Will be set when saving
-							CinemaID:   cinema.ID,
-							Date:       parsedDate,
-							Time:       time,
-							Language:   language,
-							MovieTitle: movieTitle,  // Temporary field for saving
-							CinemaName: cinema.Name, // Temporary field for saving
+						screening := database.ScrapedScreening{
+							Screening: database.Screening{
+								MovieID:  0, // Will be set when saving
+								CinemaID: cinema.ID,
+								Date:     parsedDate,
+								Time:     time,
+								Language: language,
+							},
+							MovieTitle: movieTitle,
+							CinemaName: cinema.Name,
 						}
 						screenings = append(screenings, screening)
 						s.Logger.Info("      ✅ Scraped: %s at %s on %s (Language: %s)", movieTitle, time, parsedDate.Format("2006-01-02"), language)
@@ -164,8 +166,8 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 	return screenings, nil
 }
 
-func (s *Scraper) ScrapeMulticines() ([]database.Screening, error) {
-	var allScreenings []database.Screening
+func (s *Scraper) ScrapeMulticines() ([]database.ScrapedScreening, error) {
+	var allScreenings []database.ScrapedScreening
 	var cinemas []database.Cinema
 	var err error
 
@@ -225,7 +227,7 @@ func (s *Scraper) ScrapeMulticines() ([]database.Screening, error) {
 
 		// Process each movie card by clicking and getting the URL
 		for i := 0; i < movieCount; i++ {
-			var screenings []database.Screening
+			var screenings []database.ScrapedScreening
 			s.Logger.Info("  🎥 Processing movie card %d/%d", i+1, movieCount)
 
 			// Get the current URL before clicking
