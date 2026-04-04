@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"scraper/logger"
+	"scraper/pkg/database"
 	"scraper/pkg/models"
 
 	"github.com/KarpelesLab/strftime"
@@ -162,19 +163,31 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) (
 func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 	var allScreenings []models.Screening
 
-	multicines := models.CinemaCompany{
-		Name:    "Multicines",
-		BaseURL: "https://www.multicines.com.ec",
-		Cinemas: []models.Cinema{
-			{ID: 3566, Name: "Plaza Americas", StoreID: "3566", CompanyName: "Multicines"},
-			{ID: 3555, Name: "CCI", StoreID: "3555", CompanyName: "Multicines"},
-		},
+	// Get cinemas from database
+	cinemas, err := database.GetAllCinemas()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cinemas from database: %w", err)
 	}
 
-	for _, cinema := range multicines.Cinemas {
+	// Filter for Multicines cinemas only
+	var multicinesCinemas []models.Cinema
+	for _, cinema := range cinemas {
+		if cinema.CompanyName == "Multicines" {
+			multicinesCinemas = append(multicinesCinemas, cinema)
+		}
+	}
+
+	for _, cinema := range multicinesCinemas {
 		s.Logger.Info("🎬 Starting to scrape cinema: %s", cinema.Name)
 
-		url := fmt.Sprintf("%s?cityId=19&storeId=%s", multicines.BaseURL, cinema.StoreID)
+		// Get Multicines company to get base URL
+		company, err := database.GetCinemaCompanyByName("Multicines")
+		if err != nil {
+			s.Logger.Error("❌ Error getting Multicines company: %v", err)
+			continue
+		}
+
+		url := fmt.Sprintf("%s?cityId=19&storeId=%s", company.BaseURL, cinema.StoreID)
 
 		// Navigate to the cinema page
 		err := chromedp.Run(s.Ctx,

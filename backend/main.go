@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"scraper/logger"
+	"scraper/pkg/database"
 	"scraper/pkg/scraper"
 )
 
@@ -17,6 +18,19 @@ func main() {
 	level := logger.ParseLogLevel(*logLevel)
 	log := logger.NewLogger(level)
 	log.Info("🚀 Starting Multicines scraper with log level: %s", level)
+
+	// Initialize database
+	db, err := database.InitDB("cine-uio.db")
+	if err != nil {
+		log.Fatal("Failed to initialize database: %v", err)
+	}
+	defer database.CloseDB()
+
+	// Run migrations
+	err = database.RunAllMigrations(db)
+	if err != nil {
+		log.Fatal("Failed to run database migrations: %v", err)
+	}
 
 	// Create scraper with logger
 	scraperInstance, cancel := scraper.NewScraper(log)
@@ -33,6 +47,14 @@ func main() {
 
 	log.Info("✅ Scraping completed!")
 	log.Info("📊 Total screenings (after deduplication): %d", len(screenings))
+
+	// Save screenings to database
+	err = database.SaveScreenings(screenings)
+	if err != nil {
+		log.Error("Failed to save screenings to database: %v", err)
+	} else {
+		log.Info("💾 Successfully saved %d screenings to database!", len(screenings))
+	}
 
 	log.Info("\n📋 Scraped Screenings:")
 	for _, s := range screenings {
