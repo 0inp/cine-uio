@@ -2,48 +2,53 @@ package database
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
+
+// BaseModel contains common fields for all database models
+type BaseModel struct {
+	ID        uint           `gorm:"primaryKey"`
+	CreatedAt time.Time      `gorm:"autoCreateTime"`
+	UpdatedAt time.Time      `gorm:"autoUpdateTime"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
 
 // CinemaCompany represents a cinema company (e.g., Multicines, Supercines)
 type CinemaCompany struct {
-	ID        uint      `gorm:"primaryKey"`
-	Name      string    `gorm:"unique;not null"`
-	BaseURL   string    `gorm:"not null"`
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`
-	Cinemas   []Cinema  `gorm:"foreignKey:CompanyID"`
+	BaseModel
+	Name    string   `gorm:"unique;not null"`
+	BaseURL string   `gorm:"not null"`
+	Cinemas []Cinema `gorm:"foreignKey:CompanyID"`
 }
 
 // Cinema represents an individual cinema location
 type Cinema struct {
-	ID          uint      `gorm:"primaryKey"`
-	CompanyID   uint      `gorm:"not null"`
-	Name        string    `gorm:"not null"`
-	StoreID     string    `gorm:"not null"`
-	CompanyName string    `gorm:"not null"`
-	CreatedAt   time.Time `gorm:"autoCreateTime"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime"`
+	BaseModel
+	CompanyID   uint   `gorm:"not null"`
+	Name        string `gorm:"not null"`
+	StoreID     string `gorm:"not null"`
+	CompanyName string `gorm:"not null"`
 }
 
 // Movie represents a movie that can be screened
 type Movie struct {
-	ID         uint        `gorm:"primaryKey"`
+	BaseModel
 	Title      string      `gorm:"unique;not null"`
-	CreatedAt  time.Time   `gorm:"autoCreateTime"`
-	UpdatedAt  time.Time   `gorm:"autoUpdateTime"`
 	Screenings []Screening `gorm:"foreignKey:MovieID"`
 }
 
 // Screening represents a screening time for a movie at a specific cinema
 type Screening struct {
-	ID        uint      `gorm:"primaryKey"`
-	MovieID   uint      `gorm:"not null"`
-	CinemaID  uint      `gorm:"not null"`
-	Date      time.Time `gorm:"not null"`
-	Time      string    `gorm:"not null"`
-	Language  string    `gorm:"not null"`
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	BaseModel
+	MovieID  uint      `gorm:"not null"`
+	CinemaID uint      `gorm:"not null"`
+	Date     time.Time `gorm:"not null"`
+	Time     string    `gorm:"not null"`
+	Language string    `gorm:"not null"`
+	// Temporary fields for scraping (not stored in DB)
+	MovieTitle string `gorm:"-"`
+	CinemaName string `gorm:"-"`
 }
 
 // TableName overrides for explicit table naming

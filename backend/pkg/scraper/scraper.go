@@ -8,7 +8,6 @@ import (
 
 	"scraper/logger"
 	"scraper/pkg/database"
-	"scraper/pkg/models"
 
 	"github.com/KarpelesLab/strftime"
 	"github.com/PuerkitoBio/goquery"
@@ -29,8 +28,8 @@ func NewScraper(logger *logger.Logger) (*Scraper, context.CancelFunc) {
 	}, cancel
 }
 
-func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) ([]models.Screening, error) {
-	var screenings []models.Screening
+func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema) ([]database.Screening, error) {
+	var screenings []database.Screening
 	var err error
 	var doc *goquery.Document
 	var location *time.Location
@@ -143,12 +142,14 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) (
 							language = "Unknown"
 						}
 
-						screening := models.Screening{
-							Movie:    models.Movie{Title: movieTitle},
-							Cinema:   cinema,
-							Date:     parsedDate,
-							Time:     time,
-							Language: language,
+						screening := database.Screening{
+							MovieID:    0, // Will be set when saving
+							CinemaID:   cinema.ID,
+							Date:       parsedDate,
+							Time:       time,
+							Language:   language,
+							MovieTitle: movieTitle,  // Temporary field for saving
+							CinemaName: cinema.Name, // Temporary field for saving
 						}
 						screenings = append(screenings, screening)
 						s.Logger.Info("      ✅ Scraped: %s at %s on %s (Language: %s)", movieTitle, time, parsedDate.Format("2006-01-02"), language)
@@ -163,9 +164,9 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) (
 	return screenings, nil
 }
 
-func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
-	var allScreenings []models.Screening
-	var cinemas []models.Cinema
+func (s *Scraper) ScrapeMulticines() ([]database.Screening, error) {
+	var allScreenings []database.Screening
+	var cinemas []database.Cinema
 	var err error
 
 	// Get cinemas from database
@@ -175,7 +176,7 @@ func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 	}
 
 	// Filter for Multicines cinemas only
-	var multicinesCinemas []models.Cinema
+	var multicinesCinemas []database.Cinema
 	for _, cinema := range cinemas {
 		if cinema.CompanyName == "Multicines" {
 			multicinesCinemas = append(multicinesCinemas, cinema)
@@ -224,7 +225,7 @@ func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 
 		// Process each movie card by clicking and getting the URL
 		for i := 0; i < movieCount; i++ {
-			var screenings []models.Screening
+			var screenings []database.Screening
 			s.Logger.Info("  🎥 Processing movie card %d/%d", i+1, movieCount)
 
 			// Get the current URL before clicking

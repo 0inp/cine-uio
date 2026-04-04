@@ -68,6 +68,6 @@ func main() {
 	log.Info("\n📋 Scraped Screenings:")
 	for _, s := range screenings {
 		fmt.Printf("🎬 %s at %s (%s): %s on %s\n",
-			s.Movie.Title, s.Cinema.Name, s.Language, s.Time, s.Date.Format("2006-01-02"))
+			s.MovieTitle, s.CinemaName, s.Language, s.Time, s.Date.Format("2006-01-02"))
 	}
 }

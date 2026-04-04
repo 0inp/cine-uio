@@ -4,26 +4,14 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
-	"scraper/pkg/models"
 )
 
 // CinemaService provides database operations for cinemas
-func GetAllCinemas() ([]models.Cinema, error) {
-	var dbCinemas []Cinema
-	result := DB.Find(&dbCinemas)
+func GetAllCinemas() ([]Cinema, error) {
+	var cinemas []Cinema
+	result := DB.Find(&cinemas)
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to get cinemas from database: %w", result.Error)
-	}
-
-	// Convert database cinemas to scraper models
-	var cinemas []models.Cinema
-	for _, dbCinema := range dbCinemas {
-		cinemas = append(cinemas, models.Cinema{
-			ID:          int(dbCinema.ID),
-			Name:        dbCinema.Name,
-			StoreID:     dbCinema.StoreID,
-			CompanyName: dbCinema.CompanyName,
-		})
 	}
 
 	return cinemas, nil
@@ -63,17 +51,17 @@ func GetCinemaCompanyByName(name string) (*CinemaCompany, error) {
 }
 
 // SaveScreening saves a screening to the database
-func SaveScreening(screening models.Screening) error {
+func SaveScreening(screening Screening) error {
 	// Get or create movie
 	var movie Movie
-	result := DB.Where("title = ?", screening.Movie.Title).FirstOrCreate(&movie)
+	result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle})
 	if result.Error != nil {
 		return fmt.Errorf("failed to get or create movie: %w", result.Error)
 	}
 
 	// Get cinema by name
 	var cinema Cinema
-	result = DB.Where("name = ?", screening.Cinema.Name).First(&cinema)
+	result = DB.Where("name = ?", screening.CinemaName).First(&cinema)
 	if result.Error != nil {
 		return fmt.Errorf("failed to get cinema: %w", result.Error)
 	}
@@ -96,7 +84,7 @@ func SaveScreening(screening models.Screening) error {
 }
 
 // SaveScreenings saves multiple screenings to the database
-func SaveScreenings(screenings []models.Screening) error {
+func SaveScreenings(screenings []Screening) error {
 	fmt.Printf("💾 Starting to save %d screenings to database...\n", len(screenings))
 
 	if len(screenings) == 0 {
@@ -105,10 +93,10 @@ func SaveScreenings(screenings []models.Screening) error {
 	}
 
 	for i, screening := range screenings {
-		fmt.Printf("📝 Saving screening %d/%d: %s at %s\n", i+1, len(screenings), screening.Movie.Title, screening.Cinema.Name)
+		fmt.Printf("📝 Saving screening %d/%d: %s at %s\n", i+1, len(screenings), screening.MovieTitle, screening.CinemaName)
 		err := SaveScreening(screening)
 		if err != nil {
-			return fmt.Errorf("failed to save screening for %s: %w", screening.Movie.Title, err)
+			return fmt.Errorf("failed to save screening for %s: %w", screening.MovieTitle, err)
 		}
 	}
 

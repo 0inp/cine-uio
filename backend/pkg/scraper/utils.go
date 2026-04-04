@@ -2,19 +2,19 @@ package scraper
 
 import (
 	"fmt"
-	"scraper/pkg/models"
+	"scraper/pkg/database"
 )
 
 // DeduplicateScreenings removes duplicate screenings based on movie, cinema, date, time, and language
-func DeduplicateScreenings(screenings []models.Screening) []models.Screening {
+func DeduplicateScreenings(screenings []database.Screening) []database.Screening {
 	seen := make(map[string]bool)
-	var unique []models.Screening
+	var unique []database.Screening
 
 	for _, s := range screenings {
 		// Create a unique key for each screening
 		key := fmt.Sprintf("%s|%s|%s|%s|%s",
-			s.Movie.Title,
-			s.Cinema.Name,
+			s.MovieTitle,
+			s.CinemaName,
 			s.Date.Format("2006-01-02"),
 			s.Time,
 			s.Language)
