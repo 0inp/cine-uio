@@ -58,7 +58,7 @@ func main() {
 
 	// Save screenings to database
 	fmt.Printf("💾 About to save %d screenings to database...\n", len(screenings))
-	err = database.SaveScreenings(screenings)
+	err = database.SaveScrapedScreenings(screenings)
 	if err != nil {
 		log.Error("Failed to save screenings to database: %v", err)
 	} else {
@@ -67,7 +67,8 @@ func main() {
 
 	log.Info("\n📋 Scraped Screenings:")
 	for _, s := range screenings {
-		fmt.Printf("🎬 %s at %s (%s): %s on %s\n",
-			s.MovieTitle, s.CinemaName, s.Language, s.Time, s.Date.Format("2006-01-02"))
+		// Note: We don't have cinema name here, just ID. We could look it up if needed.
+		fmt.Printf("🎬 %s (ID: %d) at %s (%s): %s on %s\n",
+			s.MovieTitle, s.CinemaID, s.Language, s.Time, s.Date.Format("2006-01-02"))
 	}
 }

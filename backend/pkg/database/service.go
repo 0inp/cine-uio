@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"gorm.io/gorm"
+	"scraper/pkg/models"
 )
 
 // CinemaService provides database operations for cinemas
@@ -50,48 +51,8 @@ func GetCinemaCompanyByName(name string) (*CinemaCompany, error) {
 	return &company, nil
 }
 
-// ScrapedScreening represents a screening with movie/cinema names for saving
-type ScrapedScreening struct {
-	Screening
-	MovieTitle string
-	CinemaName string
-}
-
-// SaveScreening saves a screening to the database
-func SaveScreening(screening ScrapedScreening) error {
-	// Get or create movie
-	var movie Movie
-	result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle})
-	if result.Error != nil {
-		return fmt.Errorf("failed to get or create movie: %w", result.Error)
-	}
-
-	// Get cinema by name
-	var cinema Cinema
-	result = DB.Where("name = ?", screening.CinemaName).First(&cinema)
-	if result.Error != nil {
-		return fmt.Errorf("failed to get cinema: %w", result.Error)
-	}
-
-	// Create screening record
-	dbScreening := Screening{
-		MovieID:  movie.ID,
-		CinemaID: cinema.ID,
-		Date:     screening.Date,
-		Time:     screening.Time,
-		Language: screening.Language,
-	}
-
-	result = DB.Create(&dbScreening)
-	if result.Error != nil {
-		return fmt.Errorf("failed to create screening: %w", result.Error)
-	}
-
-	return nil
-}
-
-// SaveScreenings saves multiple screenings to the database
-func SaveScreenings(screenings []ScrapedScreening) error {
+// SaveScrapedScreenings saves screenings from the scraper to the database
+func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 	fmt.Printf("💾 Starting to save %d screenings to database...\n", len(screenings))
 
 	if len(screenings) == 0 {
@@ -100,16 +61,38 @@ func SaveScreenings(screenings []ScrapedScreening) error {
 	}
 
 	for i, screening := range screenings {
-		fmt.Printf("📝 Saving screening %d/%d: %s at %s\n", i+1, len(screenings), screening.MovieTitle, screening.CinemaName)
-		scraped := ScrapedScreening{
-			Screening:  screening.Screening,
-			MovieTitle: screening.MovieTitle,
-			CinemaName: screening.CinemaName,
+		// Get or create movie by title
+		var movie Movie
+		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle})
+		if result.Error != nil {
+			return fmt.Errorf("failed to get or create movie '%s': %w", screening.MovieTitle, result.Error)
 		}
-		err := SaveScreening(scraped)
-		if err != nil {
-			return fmt.Errorf("failed to save screening for %s: %w", screening.MovieTitle, err)
+
+		// Update the screening with the actual movie ID
+		screening.MovieID = movie.ID
+
+		// Get cinema by ID (we already have this from scraping)
+		var cinema Cinema
+		result = DB.Where("id = ?", screening.CinemaID).First(&cinema)
+		if result.Error != nil {
+			return fmt.Errorf("failed to get cinema with ID %d: %w", screening.CinemaID, result.Error)
 		}
+
+		// Create screening record
+		dbScreening := Screening{
+			MovieID:  screening.MovieID,
+			CinemaID: screening.CinemaID,
+			Date:     screening.Date,
+			Time:     screening.Time,
+			Language: screening.Language,
+		}
+
+		result = DB.Create(&dbScreening)
+		if result.Error != nil {
+			return fmt.Errorf("failed to create screening for %s: %w", screening.MovieTitle, result.Error)
+		}
+
+		fmt.Printf("📝 Saved screening %d/%d: %s at %s\n", i+1, len(screenings), screening.MovieTitle, cinema.Name)
 	}
 
 	fmt.Printf("✅ Successfully saved %d screenings to database!\n", len(screenings))
