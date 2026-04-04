@@ -6,6 +6,7 @@ import (
 
 	"scraper/logger"
 	"scraper/pkg/database"
+	"scraper/pkg/database/migrations"
 	"scraper/pkg/scraper"
 )
 
@@ -27,7 +28,7 @@ func main() {
 	defer database.CloseDB()
 
 	// Run migrations
-	err = database.RunAllMigrations(db)
+	err = migrations.RunAllMigrations(db)
 	if err != nil {
 		log.Fatal("Failed to run database migrations: %v", err)
 	}

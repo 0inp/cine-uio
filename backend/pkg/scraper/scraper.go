@@ -31,11 +31,14 @@ func NewScraper(logger *logger.Logger) (*Scraper, context.CancelFunc) {
 
 func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) ([]models.Screening, error) {
 	var screenings []models.Screening
+	var err error
+	var doc *goquery.Document
+	var location *time.Location
 
 	s.Logger.Info("  → Starting to scrape movie page: %s", movieURL)
 
 	var movieHTML string
-	err := chromedp.Run(s.Ctx,
+	err = chromedp.Run(s.Ctx,
 		chromedp.Navigate(movieURL),
 		chromedp.WaitVisible("body", chromedp.ByQuery),
 		// Wait for the session type container to be visible (dynamic content)
@@ -47,7 +50,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) (
 		return nil, fmt.Errorf("error navigating to movie page: %w", err)
 	}
 
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader(movieHTML))
+	doc, err = goquery.NewDocumentFromReader(strings.NewReader(movieHTML))
 	if err != nil {
 		return nil, fmt.Errorf("error parsing HTML: %w", err)
 	}
@@ -75,7 +78,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) (
 	s.Logger.Info("  📆 Found month on page: '%s'", monthName)
 
 	// Define the timezone for Quito, Ecuador (UTC-5)
-	location, err := time.LoadLocation("America/Guayaquil")
+	location, err = time.LoadLocation("America/Guayaquil")
 	if err != nil {
 		panic(err)
 	}
@@ -162,9 +165,11 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema models.Cinema) (
 
 func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 	var allScreenings []models.Screening
+	var cinemas []models.Cinema
+	var err error
 
 	// Get cinemas from database
-	cinemas, err := database.GetAllCinemas()
+	cinemas, err = database.GetAllCinemas()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cinemas from database: %w", err)
 	}
@@ -177,11 +182,12 @@ func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 		}
 	}
 
+	var company *database.CinemaCompany
 	for _, cinema := range multicinesCinemas {
 		s.Logger.Info("🎬 Starting to scrape cinema: %s", cinema.Name)
 
 		// Get Multicines company to get base URL
-		company, err := database.GetCinemaCompanyByName("Multicines")
+		company, err = database.GetCinemaCompanyByName("Multicines")
 		if err != nil {
 			s.Logger.Error("❌ Error getting Multicines company: %v", err)
 			continue
@@ -190,7 +196,7 @@ func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 		url := fmt.Sprintf("%s?cityId=19&storeId=%s", company.BaseURL, cinema.StoreID)
 
 		// Navigate to the cinema page
-		err := chromedp.Run(s.Ctx,
+		err = chromedp.Run(s.Ctx,
 			chromedp.Navigate(url),
 			chromedp.WaitVisible("body", chromedp.ByQuery),
 			chromedp.Sleep(5*time.Second), // Wait for JS to load
@@ -218,6 +224,7 @@ func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 
 		// Process each movie card by clicking and getting the URL
 		for i := 0; i < movieCount; i++ {
+			var screenings []models.Screening
 			s.Logger.Info("  🎥 Processing movie card %d/%d", i+1, movieCount)
 
 			// Get the current URL before clicking
@@ -251,7 +258,7 @@ func (s *Scraper) ScrapeMulticines() ([]models.Screening, error) {
 			s.Logger.Info("    🔗 Movie URL: %s", movieURL)
 
 			// Scrape the screenings from the movie page
-			screenings, err := s.ScrapeMovieScreenings(movieURL, cinema)
+			screenings, err = s.ScrapeMovieScreenings(movieURL, cinema)
 			if err != nil {
 				s.Logger.Error("    ❌ Error scraping movie screenings: %v", err)
 			} else {
