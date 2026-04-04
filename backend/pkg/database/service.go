@@ -61,21 +61,18 @@ func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 	}
 
 	for i, screening := range screenings {
-		// Get or create movie by title
-		var movie Movie
-		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle})
-		if result.Error != nil {
-			return fmt.Errorf("failed to get or create movie '%s': %w", screening.MovieTitle, result.Error)
-		}
-
-		// Update the screening with the actual movie ID
-		screening.MovieID = movie.ID
-
 		// Get cinema by ID (we already have this from scraping)
 		var cinema Cinema
-		result = DB.Where("id = ?", screening.CinemaID).First(&cinema)
+		result := DB.Where("id = ?", screening.CinemaID).First(&cinema)
 		if result.Error != nil {
 			return fmt.Errorf("failed to get cinema with ID %d: %w", screening.CinemaID, result.Error)
+		}
+
+		// Get movie by ID (already looked up during scraping)
+		var movie Movie
+		result = DB.Where("id = ?", screening.MovieID).First(&movie)
+		if result.Error != nil {
+			return fmt.Errorf("failed to get movie with ID %d: %w", screening.MovieID, result.Error)
 		}
 
 		// Create screening record
@@ -89,10 +86,10 @@ func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 
 		result = DB.Create(&dbScreening)
 		if result.Error != nil {
-			return fmt.Errorf("failed to create screening for %s: %w", screening.MovieTitle, result.Error)
+			return fmt.Errorf("failed to create screening for movie ID %d: %w", screening.MovieID, result.Error)
 		}
 
-		fmt.Printf("📝 Saved screening %d/%d: %s at %s\n", i+1, len(screenings), screening.MovieTitle, cinema.Name)
+		fmt.Printf("📝 Saved screening %d/%d: %s at %s\n", i+1, len(screenings), movie.Title, cinema.Name)
 	}
 
 	fmt.Printf("✅ Successfully saved %d screenings to database!\n", len(screenings))

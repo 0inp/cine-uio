@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"fmt"
+	"scraper/pkg/database"
 	"scraper/pkg/models"
 )
 
@@ -12,9 +13,17 @@ func DeduplicateScreenings(screenings []models.ScrapedScreening) []models.Scrape
 
 	for _, s := range screenings {
 		// Create a unique key for each screening
-		// Note: We use CinemaID instead of CinemaName since that's what we have
+		// We need to get the movie title for deduplication
+		// Since we don't have it in ScrapedScreening, we'll need to look it up
+		var movie database.Movie
+		result := database.DB.Where("id = ?", s.MovieID).First(&movie)
+		if result.Error != nil {
+			// If we can't find the movie, skip this screening
+			continue
+		}
+
 		key := fmt.Sprintf("%s|%d|%s|%s|%s",
-			s.MovieTitle,
+			movie.Title,
 			s.CinemaID,
 			s.Date.Format("2006-01-02"),
 			s.Time,

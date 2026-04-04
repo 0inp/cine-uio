@@ -67,8 +67,9 @@ func main() {
 
 	log.Info("\n📋 Scraped Screenings:")
 	for _, s := range screenings {
-		// Note: We don't have cinema name here, just ID. We could look it up if needed.
-		fmt.Printf("🎬 %s (ID: %d) at %s (%s): %s on %s\n",
-			s.MovieTitle, s.CinemaID, s.Language, s.Time, s.Date.Format("2006-01-02"))
+		// Note: We don't have movie/cinema names here, just IDs.
+		// For display, we could look them up, but keeping it simple for now.
+		fmt.Printf("🎬 MovieID:%d CinemaID:%d at %s (%s): %s on %s\n",
+			s.MovieID, s.CinemaID, s.Language, s.Time, s.Date.Format("2006-01-02"))
 	}
 }
