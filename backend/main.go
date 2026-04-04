@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"scraper/logger"
 	"scraper/pkg/database"
@@ -57,7 +56,6 @@ func main() {
 	log.Info("📊 Total screenings (after deduplication): %d", len(screenings))
 
 	// Save screenings to database
-	fmt.Printf("💾 About to save %d screenings to database...\n", len(screenings))
 	err = database.SaveScrapedScreenings(screenings)
 	if err != nil {
 		log.Error("Failed to save screenings to database: %v", err)
@@ -65,9 +63,5 @@ func main() {
 		log.Info("💾 Successfully saved %d screenings to database!", len(screenings))
 	}
 
-	log.Info("\n📋 Scraped Screenings:")
-	for _, s := range screenings {
-		fmt.Printf("🎬 %s at %s (%s): %s on %s\n",
-			s.MovieTitle, s.CinemaName, s.Language, s.Time, s.Date.Format("2006-01-02"))
-	}
+	log.Info("✅ Scraped %d screening(s) for this movie and date", len(screenings))
 }

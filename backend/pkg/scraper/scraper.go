@@ -69,7 +69,7 @@ func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieTitle string,
 		s.Logger.Debug("dateStr : %s", dateStr)
 
 		if parsedDate, exists := expectedDates[dateStr]; exists {
-			s.Logger.Info("    → Processing expected day: %s -> %s", dateStr, parsedDate.Format("2006-01-02"))
+			s.Logger.Debug("    → Processing expected day: %s -> %s", dateStr, parsedDate.Format("2006-01-02"))
 
 			// Process session containers for this day
 			sessionContainers.Each(func(j int, sessionContainer *goquery.Selection) {
@@ -103,7 +103,7 @@ func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieTitle string,
 							Language:   language,
 						}
 						screenings = append(screenings, screening)
-						s.Logger.Info("      ✅ Scraped: %s at %s on %s (Language: %s)", movieTitle, time, parsedDate.Format("2006-01-02"), language)
+						s.Logger.Debug("      ✅ Scraped: %s at %s on %s (Language: %s)", movieTitle, time, parsedDate.Format("2006-01-02"), language)
 					})
 				})
 			})
@@ -145,7 +145,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 			return nil, fmt.Errorf("movie title not found")
 		}
 	}
-	s.Logger.Info("  → Movie: %s", movieTitle)
+	s.Logger.Debug("  → Movie: %s", movieTitle)
 
 	// Scrape the screening times using the helper function
 	screenings, err = s.scrapeScreeningTimes(doc, movieTitle, cinema)

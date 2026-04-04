@@ -2,8 +2,8 @@ package database
 
 import (
 	"fmt"
-
 	"gorm.io/gorm"
+	"log"
 	"scraper/pkg/models"
 )
 
@@ -53,7 +53,7 @@ func GetCinemaCompanyByName(name string) (*CinemaCompany, error) {
 
 // SaveScrapedScreenings saves screenings from the scraper to the database
 func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
-	fmt.Printf("💾 Starting to save %d screenings to database...\n", len(screenings))
+	log.Printf("💾 Starting to save %d screenings to database...", len(screenings))
 
 	if len(screenings) == 0 {
 		fmt.Println("⚠️  No screenings to save - empty slice received")
@@ -90,7 +90,7 @@ func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 			return fmt.Errorf("failed to create screening for %s: %w", screening.MovieTitle, result.Error)
 		}
 
-		fmt.Printf("📝 Saved screening %d/%d: %s at %s\n", i+1, len(screenings), screening.MovieTitle, screening.CinemaName)
+		log.Printf("📝 Saved screening %d/%d: %s at %s", i+1, len(screenings), screening.MovieTitle, screening.CinemaName)
 	}
 
 	fmt.Printf("✅ Successfully saved %d screenings to database!\n", len(screenings))
