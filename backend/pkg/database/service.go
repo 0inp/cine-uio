@@ -61,24 +61,25 @@ func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 	}
 
 	for i, screening := range screenings {
-		// Get cinema by ID (we already have this from scraping)
+		var movie Movie
 		var cinema Cinema
-		result := DB.Where("id = ?", screening.CinemaID).First(&cinema)
+
+		// Get or create movie by title
+		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle})
 		if result.Error != nil {
-			return fmt.Errorf("failed to get cinema with ID %d: %w", screening.CinemaID, result.Error)
+			return fmt.Errorf("failed to get or create movie '%s': %w", screening.MovieTitle, result.Error)
 		}
 
-		// Get movie by ID (already looked up during scraping)
-		var movie Movie
-		result = DB.Where("id = ?", screening.MovieID).First(&movie)
+		// Get or create cinema by name
+		result = DB.Where("name = ?", screening.CinemaName).FirstOrCreate(&cinema, Cinema{Name: screening.CinemaName, CompanyID: 1, StoreID: "unknown", CompanyName: "Unknown"})
 		if result.Error != nil {
-			return fmt.Errorf("failed to get movie with ID %d: %w", screening.MovieID, result.Error)
+			return fmt.Errorf("failed to get or create cinema '%s': %w", screening.CinemaName, result.Error)
 		}
 
 		// Create screening record
 		dbScreening := Screening{
-			MovieID:  screening.MovieID,
-			CinemaID: screening.CinemaID,
+			MovieID:  movie.ID,
+			CinemaID: cinema.ID,
 			Date:     screening.Date,
 			Time:     screening.Time,
 			Language: screening.Language,
@@ -86,10 +87,10 @@ func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 
 		result = DB.Create(&dbScreening)
 		if result.Error != nil {
-			return fmt.Errorf("failed to create screening for movie ID %d: %w", screening.MovieID, result.Error)
+			return fmt.Errorf("failed to create screening for %s: %w", screening.MovieTitle, result.Error)
 		}
 
-		fmt.Printf("📝 Saved screening %d/%d: %s at %s\n", i+1, len(screenings), movie.Title, cinema.Name)
+		fmt.Printf("📝 Saved screening %d/%d: %s at %s\n", i+1, len(screenings), screening.MovieTitle, screening.CinemaName)
 	}
 
 	fmt.Printf("✅ Successfully saved %d screenings to database!\n", len(screenings))

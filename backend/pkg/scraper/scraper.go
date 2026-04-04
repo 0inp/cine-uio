@@ -29,18 +29,8 @@ func NewScraper(logger *logger.Logger) (*Scraper, context.CancelFunc) {
 	}, cancel
 }
 
-// getOrCreateMovieID gets a movie ID by title, creating it if it doesn't exist
-func (s *Scraper) getOrCreateMovieID(movieTitle string) (uint, error) {
-	var movie database.Movie
-	result := database.DB.Where("title = ?", movieTitle).FirstOrCreate(&movie, database.Movie{Title: movieTitle})
-	if result.Error != nil {
-		return 0, fmt.Errorf("failed to get or create movie '%s': %w", movieTitle, result.Error)
-	}
-	return movie.ID, nil
-}
-
 // scrapeScreeningTimes scrapes the screening times for a movie on specific dates
-func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieID uint, movieTitle string, cinema database.Cinema) ([]models.ScrapedScreening, error) {
+func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieTitle string, cinema database.Cinema) ([]models.ScrapedScreening, error) {
 	var screenings []models.ScrapedScreening
 	var err error
 	var location *time.Location
@@ -106,9 +96,8 @@ func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieID uint, movi
 						}
 
 						screening := models.ScrapedScreening{
-							MovieID:    movieID,    // Already looked up/created
-							MovieTitle: movieTitle, // For reference/logging
-							CinemaID:   cinema.ID,
+							MovieTitle: movieTitle,  // For lookup in database service
+							CinemaName: cinema.Name, // For lookup in database service
 							Date:       parsedDate,
 							Time:       time,
 							Language:   language,
@@ -158,15 +147,8 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 	}
 	s.Logger.Info("  → Movie: %s", movieTitle)
 
-	// Get or create movie ID immediately
-	movieID, err := s.getOrCreateMovieID(movieTitle)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get or create movie ID: %w", err)
-	}
-	s.Logger.Debug("  → Movie ID: %d", movieID)
-
 	// Scrape the screening times using the helper function
-	screenings, err = s.scrapeScreeningTimes(doc, movieID, movieTitle, cinema)
+	screenings, err = s.scrapeScreeningTimes(doc, movieTitle, cinema)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scrape screening times: %w", err)
 	}
