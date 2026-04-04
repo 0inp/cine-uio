@@ -33,6 +33,13 @@ func main() {
 		log.Fatal("Failed to run database migrations: %v", err)
 	}
 
+	// Clear old screening data before new scrape
+	err = database.ClearOldScreeningData()
+	if err != nil {
+		log.Warn("Warning: Failed to clear old screening data: %v", err)
+		// Don't fail the scrape if we can't clear old data
+	}
+
 	// Create scraper with logger
 	scraperInstance, cancel := scraper.NewScraper(log)
 	defer cancel()
@@ -50,6 +57,7 @@ func main() {
 	log.Info("📊 Total screenings (after deduplication): %d", len(screenings))
 
 	// Save screenings to database
+	fmt.Printf("💾 About to save %d screenings to database...\n", len(screenings))
 	err = database.SaveScreenings(screenings)
 	if err != nil {
 		log.Error("Failed to save screenings to database: %v", err)
