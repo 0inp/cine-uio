@@ -10,10 +10,8 @@ import (
 	"scraper/pkg/database"
 	"scraper/pkg/models"
 
-	"github.com/KarpelesLab/strftime"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/chromedp"
-	"golang.org/x/text/language"
 )
 
 type Scraper struct {
@@ -29,11 +27,9 @@ func NewScraper(logger *logger.Logger) (*Scraper, context.CancelFunc) {
 	}, cancel
 }
 
-// scrapeScreeningTimes scrapes the screening times for a movie on specific dates
-func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieTitle string, cinema database.Cinema) ([]models.ScrapedScreening, error) {
+// scrapeScreeningTimesFromHTML scrapes the screening times from HTML for a specific date
+func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle string, cinema database.Cinema, date time.Time) ([]models.ScrapedScreening, error) {
 	var screenings []models.ScrapedScreening
-	var err error
-	var location *time.Location
 
 	// Find all session type containers
 	sessionContainers := doc.Find(".MovieDetail__content__session-type")
@@ -42,72 +38,66 @@ func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieTitle string,
 		return screenings, nil
 	}
 
-	// Define the timezone for Quito, Ecuador (UTC-5)
-	location, err = time.LoadLocation("America/Guayaquil")
-	if err != nil {
-		return nil, fmt.Errorf("failed to load timezone: %w", err)
+	// Use the provided date for all screenings on this day
+	// Extract just the date part (without time) for storage
+	dateOnly := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	s.Logger.Debug("  → Processing screenings for date: %s", dateOnly.Format("2006-01-02"))
+
+	// Process session containers for this day
+	if sessionContainers.Length() == 0 {
+		s.Logger.Warn("  ⚠ No session type containers found")
+		return screenings, nil
 	}
 
-	// Start from today's date in Quito's timezone
-	startDate := time.Now().In(location)
-	expectedDates := make(map[string]time.Time)
+	sessionContainers.Each(func(j int, sessionContainer *goquery.Selection) {
+		sessionTypes := sessionContainer.Find(".SessionType")
+		if sessionTypes.Length() == 0 {
+			sessionTypes = sessionContainer.Find(".sc-10d01b1b-0")
+		}
 
-	// Create a formatter for Spanish locale
-	formatter := strftime.New(language.Make("es"))
+		sessionTypes.Each(func(k int, session *goquery.Selection) {
+			// Extract language from the current session type
+			language := session.Find(".SessionType__name").Text()
+			if language == "" {
+				language = session.Find(".sc-10d01b1b-0 .SessionType__name").Text()
+			}
+			if language == "" {
+				language = "Unknown"
+			}
 
-	for i := 0; i < 7; i++ {
-		currentDate := startDate.AddDate(0, 0, i)
-		formatted := formatter.Format("%a. %d", currentDate)
-		expectedDates[formatted] = currentDate
-	}
+			// Find all session times within this specific session type
+			// Look for times in the current session's theater type list
+			theaterTypes := session.Find(".TheaterType")
+			if theaterTypes.Length() == 0 {
+				theaterTypes = session.Find(".sc-ba5c4fe5-0")
+			}
 
-	// Process each day element, but only those that match our expected dates
-	doc.Find(".Day").Each(func(i int, day *goquery.Selection) {
-		dayName := strings.TrimSpace(day.Find(".Day__name").Text())
-		dayDate := strings.TrimSpace(day.Find(".Day__number").Text())
-		dateStr := strings.ToLower(fmt.Sprintf("%s %s", dayName, dayDate))
-		s.Logger.Debug("dateStr : %s", dateStr)
-
-		if parsedDate, exists := expectedDates[dateStr]; exists {
-			s.Logger.Debug("    → Processing expected day: %s -> %s", dateStr, parsedDate.Format("2006-01-02"))
-
-			// Process session containers for this day
-			sessionContainers.Each(func(j int, sessionContainer *goquery.Selection) {
-				sessionTypes := sessionContainer.Find(".SessionType")
-				if sessionTypes.Length() == 0 {
-					sessionTypes = sessionContainer.Find(".sc-10d01b1b-0")
+			theaterTypes.Each(func(m int, theaterType *goquery.Selection) {
+				// Find all session times within this theater type
+				sessionTimes := theaterType.Find(".ScheduleSession .ScheduleSession__text")
+				if sessionTimes.Length() == 0 {
+					sessionTimes = theaterType.Find(".sc-870fb5d6-0 .ScheduleSession__text")
 				}
 
-				sessionTypes.Each(func(k int, session *goquery.Selection) {
-					sessionTimes := session.Find(".ScheduleSession .ScheduleSession__text")
-					if sessionTimes.Length() == 0 {
-						sessionTimes = session.Find(".sc-870fb5d6-0 .ScheduleSession__text")
+				sessionTimes.Each(func(l int, timeSel *goquery.Selection) {
+					time := strings.TrimSpace(timeSel.Text())
+					if time == "" {
+						return
 					}
 
-					sessionTimes.Each(func(l int, timeSel *goquery.Selection) {
-						time := strings.TrimSpace(timeSel.Text())
-						if time == "" {
-							return
-						}
-
-						language := session.Find(".SessionType__name").Text()
-						if language == "" {
-							language = "Unknown"
-						}
-
-						screening := models.ScrapedScreening{
-							MovieTitle: movieTitle,  // For lookup in database service
-							CinemaName: cinema.Name, // For lookup in database service
-							Date:       parsedDate,
-							Time:       time,
-							Language:   language,
-						}
-						screenings = append(screenings, screening)
-						s.Logger.Debug("      ✅ Scraped: %s at %s on %s (Language: %s)", movieTitle, time, parsedDate.Format("2006-01-02"), language)
-					})
+					screening := models.ScrapedScreening{
+						MovieTitle: movieTitle,  // For lookup in database service
+						CinemaName: cinema.Name, // For lookup in database service
+						StoreID:    cinema.StoreID,
+						Date:       dateOnly, // Use date-only value
+						Time:       time,
+						Language:   language,
+					}
+					screenings = append(screenings, screening)
+					s.Logger.Debug("      ✅ Scraped: %s at %s on %s (Language: %s)", movieTitle, time, dateOnly.Format("2006-01-02"), language)
 				})
 			})
-		}
+		})
 	})
 
 	return screenings, nil
@@ -116,41 +106,84 @@ func (s *Scraper) scrapeScreeningTimes(doc *goquery.Document, movieTitle string,
 func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema) ([]models.ScrapedScreening, error) {
 	var screenings []models.ScrapedScreening
 	var err error
-	var doc *goquery.Document
 
 	s.Logger.Info("  → Starting to scrape movie page: %s", movieURL)
 
-	var movieHTML string
+	// Navigate to the movie page
 	err = chromedp.Run(s.Ctx,
 		chromedp.Navigate(movieURL),
 		chromedp.WaitVisible("body", chromedp.ByQuery),
-		// Wait for the session type container to be visible (dynamic content)
-		chromedp.WaitVisible(".MovieDetail__content__session-type", chromedp.ByQuery),
-		chromedp.Sleep(3*time.Second), // Short additional wait for any remaining content
-		chromedp.OuterHTML("body", &movieHTML, chromedp.ByQuery),
+		// Wait for the slick slider to be ready
+		chromedp.WaitVisible(`.MovieDetail__content__days`, chromedp.ByQuery),
+		chromedp.Sleep(2*time.Second), // Wait for initial content to load
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error navigating to movie page: %w", err)
 	}
 
-	doc, err = goquery.NewDocumentFromReader(strings.NewReader(movieHTML))
-	if err != nil {
-		return nil, fmt.Errorf("error parsing HTML: %w", err)
-	}
-
-	movieTitle := doc.Find(".MovieCard__title").Text()
-	if movieTitle == "" {
-		movieTitle = doc.Find("h1").Text()
-		if movieTitle == "" {
+	// Get the movie title
+	var movieTitle string
+	err = chromedp.Run(s.Ctx,
+		chromedp.Text(".MovieCard__title", &movieTitle, chromedp.ByQuery),
+	)
+	if err != nil || movieTitle == "" {
+		err = chromedp.Run(s.Ctx,
+			chromedp.Text("h1", &movieTitle, chromedp.ByQuery),
+		)
+		if err != nil || movieTitle == "" {
 			return nil, fmt.Errorf("movie title not found")
 		}
 	}
 	s.Logger.Debug("  → Movie: %s", movieTitle)
 
-	// Scrape the screening times using the helper function
-	screenings, err = s.scrapeScreeningTimes(doc, movieTitle, cinema)
-	if err != nil {
-		return nil, fmt.Errorf("failed to scrape screening times: %w", err)
+	// Scrape screenings for each day by clicking on day buttons (data-index 0-6)
+	for dayIndex := 0; dayIndex < 7; dayIndex++ {
+		s.Logger.Debug("  → Processing day %d", dayIndex)
+
+		if dayIndex > 0 {
+			// Click on the day button for days 1-6
+			s.Logger.Debug("  → Clicking on day %d (data-index=%d)", dayIndex, dayIndex)
+			err = chromedp.Run(s.Ctx,
+				chromedp.Click(fmt.Sprintf(`.slick-slide[data-index="%d"]`, dayIndex), chromedp.ByQuery),
+				chromedp.Sleep(3*time.Second), // Wait for XHR to complete
+			)
+			if err != nil {
+				s.Logger.Warn("    ⚠ Error clicking day %d: %v", dayIndex, err)
+				continue
+			}
+		}
+
+		// Get the current date for this day
+		currentDate := time.Now().In(time.FixedZone("ECT", -5*60*60)) // Ecuador Time (UTC-5)
+		if dayIndex > 0 {
+			currentDate = currentDate.AddDate(0, 0, dayIndex)
+		}
+
+		// Parse the page to get screenings for this day
+		var dayHTML string
+		err = chromedp.Run(s.Ctx,
+			chromedp.OuterHTML("body", &dayHTML, chromedp.ByQuery),
+		)
+		if err != nil {
+			s.Logger.Warn("    ⚠ Error getting HTML for day %d: %v", dayIndex, err)
+			continue
+		}
+
+		// Parse the HTML and scrape screenings for this day
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(dayHTML))
+		if err != nil {
+			s.Logger.Warn("    ⚠ Error parsing HTML for day %d: %v", dayIndex, err)
+			continue
+		}
+
+		// Scrape screenings for this specific day
+		dayScreenings, err := s.scrapeScreeningTimesFromHTML(doc, movieTitle, cinema, currentDate)
+		if err != nil {
+			s.Logger.Warn("    ⚠ Error scraping screenings for day %d: %v", dayIndex, err)
+			continue
+		}
+
+		screenings = append(screenings, dayScreenings...)
 	}
 
 	return screenings, nil
@@ -167,16 +200,8 @@ func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreening, error) {
 		return nil, fmt.Errorf("failed to get cinemas from database: %w", err)
 	}
 
-	// Filter for Multicines cinemas only
-	var multicinesCinemas []database.Cinema
-	for _, cinema := range cinemas {
-		if cinema.CompanyName == "Multicines" {
-			multicinesCinemas = append(multicinesCinemas, cinema)
-		}
-	}
-
 	var company *database.CinemaCompany
-	for _, cinema := range multicinesCinemas {
+	for _, cinema := range cinemas {
 		s.Logger.Info("🎬 Starting to scrape cinema: %s", cinema.Name)
 
 		// Get Multicines company to get base URL
