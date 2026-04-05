@@ -20,10 +20,9 @@ type CinemaCompany struct {
 // Cinema represents an individual cinema location
 type Cinema struct {
 	BaseModel
-	CompanyID   uint   `gorm:"not null"`
-	Name        string `gorm:"not null"`
-	StoreID     string `gorm:"not null"`
-	CompanyName string `gorm:"not null"`
+	CompanyID uint   `gorm:"not null"`
+	Name      string `gorm:"not null"`
+	StoreID   string `gorm:"not null"`
 }
 
 // Movie represents a movie that can be screened

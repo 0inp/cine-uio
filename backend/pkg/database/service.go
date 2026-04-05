@@ -42,6 +42,16 @@ func ClearOldScreeningData() error {
 }
 
 // GetCinemaCompanyByName gets a cinema company by name
+func GetCinemaCompanyByID(id uint) (*CinemaCompany, error) {
+	var company CinemaCompany
+	result := DB.Where("id = ?", id).First(&company)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to get cinema company: %w", result.Error)
+	}
+	return &company, nil
+}
+
+// GetCinemaCompanyByName gets a cinema company by name
 func GetCinemaCompanyByName(name string) (*CinemaCompany, error) {
 	var company CinemaCompany
 	result := DB.Where("name = ?", name).First(&company)
@@ -70,8 +80,18 @@ func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 			return fmt.Errorf("failed to get or create movie '%s': %w", screening.MovieTitle, result.Error)
 		}
 
-		// Get or create cinema by name
-		result = DB.Where("name = ?", screening.CinemaName).FirstOrCreate(&cinema, Cinema{Name: screening.CinemaName, CompanyID: 1, StoreID: "unknown", CompanyName: "Unknown"})
+		// Get or create cinema by name and store ID
+		result = DB.Where("name = ? AND store_id = ?", screening.CinemaName, screening.StoreID).First(&cinema)
+		if result.Error != nil {
+			// If not found, try to find by name only
+			result = DB.Where("name = ?", screening.CinemaName).First(&cinema)
+			if result.Error != nil {
+				// If still not found, create new cinema with proper company info
+				// Since we're scraping Multicines, we know the company
+				cinema = Cinema{Name: screening.CinemaName, CompanyID: 1, StoreID: screening.StoreID}
+				result = DB.Create(&cinema)
+			}
+		}
 		if result.Error != nil {
 			return fmt.Errorf("failed to get or create cinema '%s': %w", screening.CinemaName, result.Error)
 		}

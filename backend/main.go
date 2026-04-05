@@ -43,7 +43,7 @@ func main() {
 	scraperInstance, cancel := scraper.NewScraper(log)
 	defer cancel()
 
-	// Run the scraper
+	// Run the full scraper for all cinemas and all movies
 	screenings, err := scraperInstance.ScrapeMulticines()
 	if err != nil {
 		log.Fatal("Scraping failed: %v", err)
@@ -53,7 +53,7 @@ func main() {
 	screenings = scraper.DeduplicateScreenings(screenings)
 
 	log.Info("✅ Scraping completed!")
-	log.Info("📊 Total screenings (after deduplication): %d", len(screenings))
+	log.Info("📊 Total screenings (after filtering): %d", len(screenings))
 
 	// Save screenings to database
 	err = database.SaveScrapedScreenings(screenings)

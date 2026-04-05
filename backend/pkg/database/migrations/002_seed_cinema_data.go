@@ -41,8 +41,8 @@ func SeedCinemaData(db *gorm.DB) error {
 
 	// Create cinemas for Multicines
 	multicinesCinemas := []database.Cinema{
-		{Name: "Plaza Americas", StoreID: "3566", CompanyName: "Multicines", CompanyID: multicines.ID},
-		{Name: "CCI", StoreID: "3555", CompanyName: "Multicines", CompanyID: multicines.ID},
+		{Name: "Plaza Americas", StoreID: "3566", CompanyID: multicines.ID},
+		{Name: "CCI", StoreID: "3555", CompanyID: multicines.ID},
 	}
 
 	for _, cinema := range multicinesCinemas {
