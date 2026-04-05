@@ -59,6 +59,9 @@ jspm_packages/
 # Go specific
 bin/
 pkg/
+# Binary executables
+scraper
+backend/scraper
 
 # Backend specific
 backend/cine-uio.db
