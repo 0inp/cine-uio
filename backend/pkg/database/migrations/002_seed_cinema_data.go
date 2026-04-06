@@ -3,8 +3,9 @@ package migrations
 import (
 	"fmt"
 
-	"gorm.io/gorm"
 	"scraper/pkg/database"
+
+	"gorm.io/gorm"
 )
 
 // SeedCinemaData runs the second migration to populate initial cinema data

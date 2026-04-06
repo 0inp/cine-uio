@@ -1,3 +1,4 @@
+// Package database provides database connectivity and operations.
 package database
 
 import (
@@ -10,6 +11,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// DB is the global database connection instance.
 var DB *gorm.DB
 
 // InitDB initializes the SQLite database connection

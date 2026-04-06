@@ -1,3 +1,4 @@
+// Package main contains the entry point for the Multicines scraper application.
 package main
 
 import (
@@ -24,7 +25,11 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to initialize database: %v", err)
 	}
-	defer database.CloseDB()
+	defer func() {
+		if err := database.CloseDB(); err != nil {
+			log.Error("Failed to close database: %v", err)
+		}
+	}()
 
 	// Run migrations
 	err = migrations.RunAllMigrations(db)

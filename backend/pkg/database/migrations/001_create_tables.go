@@ -1,10 +1,12 @@
+// Package migrations contains database migration functions.
 package migrations
 
 import (
 	"fmt"
 
-	"gorm.io/gorm"
 	"scraper/pkg/database"
+
+	"gorm.io/gorm"
 )
 
 // CreateTables runs the first migration to create all database tables

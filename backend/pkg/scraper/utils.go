@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"fmt"
+
 	"scraper/pkg/models"
 )
 

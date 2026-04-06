@@ -1,3 +1,4 @@
+// Package models contains data transfer objects and models used throughout the application.
 package models
 
 import "time"

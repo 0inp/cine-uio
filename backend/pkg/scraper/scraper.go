@@ -1,3 +1,4 @@
+// Package scraper provides web scraping functionality for cinema data.
 package scraper
 
 import (
@@ -14,11 +15,13 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// Scraper is the main web scraper for cinema data.
 type Scraper struct {
 	Ctx    context.Context
 	Logger *logger.Logger
 }
 
+// NewScraper creates a new scraper instance with the given logger.
 func NewScraper(logger *logger.Logger) (*Scraper, context.CancelFunc) {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	return &Scraper{
@@ -49,13 +52,13 @@ func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle
 		return screenings, nil
 	}
 
-	sessionContainers.Each(func(j int, sessionContainer *goquery.Selection) {
+	sessionContainers.Each(func(_ int, sessionContainer *goquery.Selection) {
 		sessionTypes := sessionContainer.Find(".SessionType")
 		if sessionTypes.Length() == 0 {
 			sessionTypes = sessionContainer.Find(".sc-10d01b1b-0")
 		}
 
-		sessionTypes.Each(func(k int, session *goquery.Selection) {
+		sessionTypes.Each(func(_ int, session *goquery.Selection) {
 			// Extract language from the current session type
 			language := session.Find(".SessionType__name").Text()
 			if language == "" {
@@ -72,14 +75,14 @@ func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle
 				theaterTypes = session.Find(".sc-ba5c4fe5-0")
 			}
 
-			theaterTypes.Each(func(m int, theaterType *goquery.Selection) {
+			theaterTypes.Each(func(_ int, theaterType *goquery.Selection) {
 				// Find all session times within this theater type
 				sessionTimes := theaterType.Find(".ScheduleSession .ScheduleSession__text")
 				if sessionTimes.Length() == 0 {
 					sessionTimes = theaterType.Find(".sc-870fb5d6-0 .ScheduleSession__text")
 				}
 
-				sessionTimes.Each(func(l int, timeSel *goquery.Selection) {
+				sessionTimes.Each(func(_ int, timeSel *goquery.Selection) {
 					time := strings.TrimSpace(timeSel.Text())
 					if time == "" {
 						return
@@ -103,6 +106,7 @@ func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle
 	return screenings, nil
 }
 
+// ScrapeMovieScreenings scrapes movie screening data from a specific movie page.
 func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema) ([]models.ScrapedScreening, error) {
 	var screenings []models.ScrapedScreening
 	var err error
@@ -189,6 +193,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 	return screenings, nil
 }
 
+// ScrapeMulticines scrapes data from all Multicines cinemas.
 func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreening, error) {
 	var allScreenings []models.ScrapedScreening
 	var cinemas []database.Cinema
@@ -266,10 +271,13 @@ func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreening, error) {
 			if err != nil {
 				s.Logger.Warn("    ⚠ Error clicking movie card %d: %v", i, err)
 				// Navigate back to the cinema page
-				chromedp.Run(s.Ctx,
+				err = chromedp.Run(s.Ctx,
 					chromedp.Navigate(currentURL),
 					chromedp.WaitVisible("body", chromedp.ByQuery),
 				)
+				if err != nil {
+					s.Logger.Warn("    ⚠ Error navigating back to cinema page after click error: %v", err)
+				}
 				continue
 			}
 
@@ -292,7 +300,9 @@ func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreening, error) {
 				s.Logger.Warn("    ⚠ Error navigating back to cinema page: %v", err)
 			}
 			// Add a small delay to ensure page is fully loaded
-			chromedp.Sleep(2 * time.Second).Do(s.Ctx)
+			if err := chromedp.Sleep(2 * time.Second).Do(s.Ctx); err != nil {
+				s.Logger.Warn("    ⚠ Error during sleep: %v", err)
+			}
 		}
 	}
 

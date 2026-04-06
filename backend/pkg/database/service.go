@@ -2,12 +2,14 @@ package database
 
 import (
 	"fmt"
-	"gorm.io/gorm"
 	"log"
+
 	"scraper/pkg/models"
+
+	"gorm.io/gorm"
 )
 
-// CinemaService provides database operations for cinemas
+// GetAllCinemas returns all cinemas from the database.
 func GetAllCinemas() ([]Cinema, error) {
 	var cinemas []Cinema
 	result := DB.Find(&cinemas)
@@ -41,7 +43,7 @@ func ClearOldScreeningData() error {
 	return nil
 }
 
-// GetCinemaCompanyByName gets a cinema company by name
+// GetCinemaCompanyByID gets a cinema company by its ID
 func GetCinemaCompanyByID(id uint) (*CinemaCompany, error) {
 	var company CinemaCompany
 	result := DB.Where("id = ?", id).First(&company)

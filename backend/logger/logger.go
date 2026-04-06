@@ -1,3 +1,4 @@
+// Package logger provides logging functionality for the application.
 package logger
 
 import (
@@ -11,10 +12,15 @@ import (
 type LogLevel int
 
 const (
+	// DEBUG represents debug log level
 	DEBUG LogLevel = iota
+	// INFO represents info log level
 	INFO
+	// WARN represents warning log level
 	WARN
+	// ERROR represents error log level
 	ERROR
+	// FATAL represents fatal log level
 	FATAL
 )
 
@@ -53,35 +59,35 @@ func NewLogger(level LogLevel) *Logger {
 // Debug logs a debug message
 func (l *Logger) Debug(format string, v ...interface{}) {
 	if l.level <= DEBUG {
-		l.logger.Output(2, fmt.Sprintf("[DEBUG] "+format, v...))
+		_ = l.logger.Output(2, fmt.Sprintf("[DEBUG] "+format, v...))
 	}
 }
 
 // Info logs an info message
 func (l *Logger) Info(format string, v ...interface{}) {
 	if l.level <= INFO {
-		l.logger.Output(2, fmt.Sprintf("[INFO] "+format, v...))
+		_ = l.logger.Output(2, fmt.Sprintf("[INFO] "+format, v...))
 	}
 }
 
 // Warn logs a warning message
 func (l *Logger) Warn(format string, v ...interface{}) {
 	if l.level <= WARN {
-		l.logger.Output(2, fmt.Sprintf("[WARN] "+format, v...))
+		_ = l.logger.Output(2, fmt.Sprintf("[WARN] "+format, v...))
 	}
 }
 
 // Error logs an error message
 func (l *Logger) Error(format string, v ...interface{}) {
 	if l.level <= ERROR {
-		l.logger.Output(2, fmt.Sprintf("[ERROR] "+format, v...))
+		_ = l.logger.Output(2, fmt.Sprintf("[ERROR] "+format, v...))
 	}
 }
 
 // Fatal logs a fatal message and exits
 func (l *Logger) Fatal(format string, v ...interface{}) {
 	if l.level <= FATAL {
-		l.logger.Output(2, fmt.Sprintf("[FATAL] "+format, v...))
+		_ = l.logger.Output(2, fmt.Sprintf("[FATAL] "+format, v...))
 	}
 	os.Exit(1)
 }

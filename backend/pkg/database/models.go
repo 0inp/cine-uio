@@ -43,18 +43,22 @@ type Screening struct {
 }
 
 // TableName overrides for explicit table naming
+// CinemaCompany.TableName returns the database table name for CinemaCompany.
 func (CinemaCompany) TableName() string {
 	return "cinema_companies"
 }
 
+// TableName returns the database table name for Cinema.
 func (Cinema) TableName() string {
 	return "cinemas"
 }
 
+// TableName returns the database table name for Movie.
 func (Movie) TableName() string {
 	return "movies"
 }
 
+// TableName returns the database table name for Screening.
 func (Screening) TableName() string {
 	return "screening_times"
 }
