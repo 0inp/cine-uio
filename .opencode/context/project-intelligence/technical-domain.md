@@ -14,8 +14,16 @@
 |-------|-----------|---------|-----------|
 | Framework | SolidJS | Latest | Reactive UI with fine-grained updates |
 | Styling | TailwindCSS | Latest | Utility-first CSS framework |
-| Backend | Go | Latest | High performance, concurrent backend |
+| Backend | Go | 1.26.1 | High performance, concurrent backend |
 | Database | SQLite | Latest | Lightweight, file-based database |
+
+## Backend Toolchain
+| Tool | Version | Purpose |
+|------|---------|---------|
+| chromedp | v0.15.1 | Headless Chrome automation for web scraping |
+| goquery | v1.12.0 | HTML parsing and DOM manipulation |
+| GORM | v1.31.1 | ORM for database operations |
+| SQLite Driver | v1.6.0 | SQLite database connectivity |
 
 ## Code Patterns
 ### API Endpoint
@@ -23,6 +31,13 @@
 
 ### Component
 *(No specific component pattern provided - using SolidJS standard patterns)*
+
+### Web Scraping
+- Use `chromedp` for headless browser automation
+- Parse HTML with `goquery` for DOM manipulation
+- Implement proper error handling and retries
+- Use context-based cancellation for cleanup
+- Handle dynamic content with appropriate waits
 
 ## Naming Conventions
 | Type | Convention | Example |
@@ -41,13 +56,17 @@
 - Use TailwindCSS for styling
 - Write unit tests for critical functions
 - Document public functions with JSDoc
+- Use semantic versioning for Go modules
+- Implement proper error wrapping in Go
+- Use context-based cancellation for long-running operations
 
 ## Security Requirements
 - Use parameterized queries to prevent SQL injection
 
 ## 📂 Codebase References
 **Implementation**: `src/` - SolidJS components and Go backend services
-**Config**: package.json, go.mod, tsconfig.json
+**Backend**: `backend/` - Go web scraping and data processing
+**Config**: package.json, go.mod, tsconfig.json, mise.toml
 
 ## Related Files
 - Business Domain (example: business-domain.md)

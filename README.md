@@ -21,6 +21,7 @@ This is currently a **backend-only** application that:
 - Extracts movie titles, screening times, dates, and languages
 - Outputs structured data to the console
 - Provides the foundation for a future web dashboard
+- Includes a comprehensive Go toolchain for web scraping and data processing
 
 ## 🚀 Getting Started
 
@@ -29,6 +30,7 @@ This is currently a **backend-only** application that:
 - Go 1.26.1 or higher
 - Google Chrome (for headless browsing)
 - Internet connection (for web scraping)
+- mise (optional, for tool version management)
 
 ### Installation
 
@@ -76,9 +78,15 @@ cine-uio/
 │   │   │   └── utils.go        # Utility functions
 │   │   ├── models/            # Data models
 │   │   │   └── models.go      # Data structures
+│   │   ├── database/          # Database operations
+│   │   │   ├── db.go           # Database connection
+│   │   │   ├── service.go     # Database services
+│   │   │   ├── models.go      # Database models
+│   │   │   └── migrations/    # Database migrations
 │   └── logger/                # Logging functionality
 │       └── logger.go          # Logger implementation
 ├── mise.toml                  # Tool version management
+├── .opencode/                 # OpenAgents framework context
 └── README.md                  # Project documentation
 ```
 
@@ -126,19 +134,23 @@ type Cinema struct {
 - Handles dynamic content loading with appropriate waits
 - Processes HTML with **goquery** for DOM parsing
 - Handles Spanish date formats and timezone conversion
+- Implements comprehensive error handling and recovery
+- Uses context-based cancellation for resource cleanup
 
 ### Timezone Handling
 
 - All dates are processed in **America/Guayaquil** timezone (UTC-5)
 - Supports Spanish locale date formatting
 - Handles 7-day forward-looking scheduling
+- Uses fixed timezone for consistent date processing
 
 ### Error Handling
 
-- Comprehensive error logging
-- Graceful handling of missing elements
+- Comprehensive error logging with multiple log levels
+- Graceful handling of missing elements and network issues
 - Automatic recovery from navigation issues
 - Deduplication of screening data
+- Context-based error handling and cleanup
 
 ## 🚧 Future Development
 
