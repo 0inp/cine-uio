@@ -1,7 +1,7 @@
+version: "2"
+
 linters:
   enable:
-    - gofmt
-    - goimports
     - revive
     - govet
     - errcheck
@@ -9,7 +9,14 @@ linters:
     - staticcheck
     - unused
 
-issues:
-  exclude-dirs:
-    - vendor
-    - .git
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - scraper
