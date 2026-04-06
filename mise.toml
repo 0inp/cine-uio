@@ -1,2 +1,9 @@
 [tools]
-go = "1.26.1"
+pre-commit = "latest"
+gitleaks = "latest"
+
+[tasks]
+install = """
+mise install && cd backend/ && mise install && cd ../frontend && mise
+install
+"""

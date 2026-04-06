@@ -1,0 +1,11 @@
+[tools]
+go = "1.26.1"
+golangci-lint = "latest"
+
+[tasks]
+fmt = "gofmt -s -w . && goimports -w ."
+lint = "golangci-lint run"
+test = "go test -race ./..."
+build = "go build ."
+run = "./scraper"
+dev = "go run ."
