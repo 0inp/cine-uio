@@ -1,0 +1,15 @@
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - revive
+    - govet
+    - errcheck
+    - gosec
+    - staticcheck
+    - unused
+
+issues:
+  exclude-dirs:
+    - vendor
+    - .git
