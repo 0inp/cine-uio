@@ -5,10 +5,10 @@ go 1.26.1
 replace scraper => .
 
 require (
-	github.com/KarpelesLab/strftime v1.0.1
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/chromedp/chromedp v0.15.1
-	golang.org/x/text v0.35.0
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.31.1
 )
 
 require (
@@ -24,6 +24,5 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.40 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
-	gorm.io/driver/sqlite v1.6.0 // indirect
-	gorm.io/gorm v1.31.1 // indirect
+	golang.org/x/text v0.35.0 // indirect
 )
