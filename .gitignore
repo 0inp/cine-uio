@@ -56,12 +56,6 @@ jspm_packages/
 # MacOS
 .DS_Store
 
-# Go specific
-bin/
-pkg/
-# Binary executables
-scraper
-backend/scraper
-
 # Backend specific
+backend/scraper
 backend/cine-uio.db
