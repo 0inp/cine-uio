@@ -1,6 +1,7 @@
 [tools]
 go = "1.26.1"
 golangci-lint = "latest"
+golangci-lint-langserver = "latest"
 
 [tasks]
 fmt = "gofmt -s -w . && goimports -w ."
