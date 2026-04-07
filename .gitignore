@@ -60,3 +60,6 @@ jspm_packages/
 backend/scraper
 backend/api
 backend/cine-uio.db
+
+# AI specific
+.tmp
