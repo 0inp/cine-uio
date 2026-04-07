@@ -58,4 +58,5 @@ jspm_packages/
 
 # Backend specific
 backend/scraper
+backend/api
 backend/cine-uio.db
