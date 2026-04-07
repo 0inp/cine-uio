@@ -3,7 +3,7 @@ package migrations
 import (
 	"fmt"
 
-	"scraper/pkg/database"
+	"scraper/internal/shared/database"
 
 	"gorm.io/gorm"
 )

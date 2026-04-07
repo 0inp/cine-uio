@@ -4,15 +4,19 @@ package main
 import (
 	"flag"
 
-	"scraper/logger"
-	"scraper/pkg/database"
-	"scraper/pkg/database/migrations"
-	"scraper/pkg/scraper"
+	"scraper/internal/scraper"
+	"scraper/internal/shared/config"
+	"scraper/internal/shared/database"
+	"scraper/internal/shared/database/migrations"
+	"scraper/internal/shared/logger"
 )
 
 func main() {
-	// Parse command line flags for log level
-	logLevel := flag.String("log-level", "info", "Log level (debug, info, warn, error, fatal)")
+	// Load configuration
+	cfg := config.LoadConfig()
+
+	// Parse command line flags for log level (can override config)
+	logLevel := flag.String("log-level", cfg.LogLevel, "Log level (debug, info, warn, error, fatal)")
 	flag.Parse()
 
 	// Create logger with specified level
@@ -21,7 +25,7 @@ func main() {
 	log.Info("🚀 Starting Multicines scraper with log level: %s", level)
 
 	// Initialize database
-	db, err := database.InitDB("cine-uio.db")
+	db, err := database.InitDB(cfg.DatabasePath)
 	if err != nil {
 		log.Fatal("Failed to initialize database: %v", err)
 	}

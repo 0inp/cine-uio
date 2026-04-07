@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"scraper/logger"
-	"scraper/pkg/database"
-	"scraper/pkg/models"
+	"scraper/internal/shared/database"
+	"scraper/internal/shared/logger"
+	"scraper/internal/shared/models"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/chromedp"

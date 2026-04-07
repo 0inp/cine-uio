@@ -3,7 +3,7 @@ package scraper
 import (
 	"fmt"
 
-	"scraper/pkg/models"
+	"scraper/internal/shared/models"
 )
 
 // DeduplicateScreenings removes duplicate screenings based on movie, cinema, date, time, and language

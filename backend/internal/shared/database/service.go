@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"scraper/pkg/models"
+	"scraper/internal/shared/models"
 
 	"gorm.io/gorm"
 )
