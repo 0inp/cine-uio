@@ -7,6 +7,7 @@ interface Screening {
 }
 interface Movie {
   title: string;
+  duration?: number; // Duration in minutes
   screenings: Screening[];
 }
 interface OrganizedScreening {
@@ -15,6 +16,7 @@ interface OrganizedScreening {
 }
 interface MovieWithScreenings {
   title: string;
+  duration?: number; // Duration in minutes
   screenings: OrganizedScreening[];
 }
 export default function MoviesPage() {
@@ -65,6 +67,7 @@ export default function MoviesPage() {
           .sort((a, b) => a.language.localeCompare(b.language));
         return {
           title: movie.title,
+          duration: movie.duration,
           screenings: organizedScreenings
         };
       })
@@ -84,7 +87,14 @@ export default function MoviesPage() {
           {(movie: MovieWithScreenings) => (
             <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
               <div class="p-6">
-                <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">{movie.title}</h2>
+                <div class="flex justify-between items-start mb-4">
+                  <h2 class="text-xl font-semibold text-gray-800 border-b pb-2 flex-1">{movie.title}</h2>
+                  {movie.duration && (
+                    <span class="text-sm text-gray-500 ml-4 whitespace-nowrap">
+                      {Math.floor(movie.duration / 60)}h {movie.duration % 60}min
+                    </span>
+                  )}
+                </div>
                 {/* Screenings organized by language */}
                 <div class="space-y-3">
                   <For each={movie.screenings}>
