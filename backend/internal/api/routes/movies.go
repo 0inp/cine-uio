@@ -22,6 +22,7 @@ type Screening struct {
 // used in the API response
 type Movie struct {
 	Title      string      `json:"title"`
+	Duration   *int        `json:"duration"` // Duration in minutes, nullable
 	Screenings []Screening `json:"screenings"`
 }
 
@@ -40,9 +41,9 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 		}
 	}()
 
-	// Query to get movies with their screening times
+	// Query to get movies with their screening times and duration
 	query := `
-		SELECT m.title, st.date, st.time, st.language
+		SELECT m.title, m.duration, st.date, st.time, st.language
 		FROM movies m
 		JOIN screening_times st ON m.id = st.movie_id
 		ORDER BY m.title, st.date, st.time
@@ -63,14 +64,21 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 	moviesMap := make(map[string]*Movie)
 	for rows.Next() {
 		var title, date, time, language string
-		if err := rows.Scan(&title, &date, &time, &language); err != nil {
+		var duration sql.NullInt32
+		if err := rows.Scan(&title, &duration, &date, &time, &language); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		if _, exists := moviesMap[title]; !exists {
+			var durationPtr *int
+			if duration.Valid {
+				durationValue := int(duration.Int32)
+				durationPtr = &durationValue
+			}
 			moviesMap[title] = &Movie{
-				Title: title,
+				Title:    title,
+				Duration: durationPtr,
 			}
 		}
 		moviesMap[title].Screenings = append(moviesMap[title].Screenings, Screening{
