@@ -13,3 +13,20 @@ type ScrapedScreening struct {
 	Time       string    // Time of the screening
 	Language   string    // Language of the screening
 }
+
+// ScrapedScreeningWithTMDB extends ScrapedScreening with TMDB data
+type ScrapedScreeningWithTMDB struct {
+	ScrapedScreening
+	TMDBDetails *MovieDetails // TMDB data including duration
+}
+
+// MovieDetails represents the response structure from TMDB movie details endpoint
+type MovieDetails struct {
+	Title         string  `json:"title"`
+	OriginalTitle string  `json:"original_title"`
+	Runtime       int     `json:"runtime"` // Duration in minutes
+	Overview      string  `json:"overview"`
+	PosterPath    string  `json:"poster_path"`
+	ReleaseDate   string  `json:"release_date"`
+	VoteAverage   float64 `json:"vote_average"`
+}

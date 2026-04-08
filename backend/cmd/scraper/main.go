@@ -9,6 +9,7 @@ import (
 	"scraper/internal/shared/database"
 	"scraper/internal/shared/database/migrations"
 	"scraper/internal/shared/logger"
+	"scraper/internal/shared/models"
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	// Create scraper with logger
-	scraperInstance, cancel := scraper.NewScraper(log)
+	scraperInstance, cancel := scraper.NewScraper(log, cfg)
 	defer cancel()
 
 	// Run the full scraper for all cinemas and all movies
@@ -59,7 +60,7 @@ func main() {
 	}
 
 	// Remove duplicate screenings
-	screenings = scraper.DeduplicateScreenings(screenings)
+	screenings = scraper.DeduplicateScreenings(screenings).([]models.ScrapedScreeningWithTMDB)
 
 	log.Info("✅ Scraping completed!")
 	log.Info("📊 Total screenings (after filtering): %d", len(screenings))

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"scraper/internal/shared/config"
 	"scraper/internal/shared/database"
 	"scraper/internal/shared/logger"
 	"scraper/internal/shared/models"
@@ -17,16 +18,18 @@ import (
 
 // Scraper is the main web scraper for cinema data.
 type Scraper struct {
-	Ctx    context.Context
-	Logger *logger.Logger
+	Ctx         context.Context
+	Logger      *logger.Logger
+	TMDBService *TMDBService
 }
 
 // NewScraper creates a new scraper instance with the given logger.
-func NewScraper(logger *logger.Logger) (*Scraper, context.CancelFunc) {
+func NewScraper(logger *logger.Logger, cfg *config.Config) (*Scraper, context.CancelFunc) {
 	ctx, cancel := chromedp.NewContext(context.Background())
 	return &Scraper{
-		Ctx:    ctx,
-		Logger: logger,
+		Ctx:         ctx,
+		Logger:      logger,
+		TMDBService: NewTMDBService(cfg),
 	}, cancel
 }
 
@@ -193,8 +196,44 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 	return screenings, nil
 }
 
+// fetchTMDBDataForScreenings fetches TMDB data for all unique movie titles in screenings
+func (s *Scraper) fetchTMDBDataForScreenings(screenings []models.ScrapedScreening) []models.ScrapedScreeningWithTMDB {
+	// Collect unique movie titles
+	movieTitles := make(map[string]bool)
+	for _, screening := range screenings {
+		movieTitles[screening.MovieTitle] = true
+	}
+
+	// Fetch TMDB data for each unique movie
+	movieTMDBMap := make(map[string]*models.MovieDetails)
+	for title := range movieTitles {
+		s.Logger.Info("🔍 Fetching TMDB data for: %s", title)
+
+		details, err := s.TMDBService.GetMovieTMDBDetailsByScrapedTitle(title)
+		if err != nil {
+			s.Logger.Warn("⚠️  TMDB data not found for '%s': %v", title, err)
+			continue
+		}
+
+		movieTMDBMap[title] = details
+		s.Logger.Info("✅ Found TMDB data for '%s': %d minutes", title, details.Runtime)
+	}
+
+	// Create enhanced screenings with TMDB data
+	var screeningsWithTMDB []models.ScrapedScreeningWithTMDB
+	for _, screening := range screenings {
+		details := movieTMDBMap[screening.MovieTitle]
+		screeningsWithTMDB = append(screeningsWithTMDB, models.ScrapedScreeningWithTMDB{
+			ScrapedScreening: screening,
+			TMDBDetails:      details,
+		})
+	}
+
+	return screeningsWithTMDB
+}
+
 // ScrapeMulticines scrapes data from all Multicines cinemas.
-func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreening, error) {
+func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreeningWithTMDB, error) {
 	var allScreenings []models.ScrapedScreening
 	var cinemas []database.Cinema
 	var err error
@@ -306,5 +345,8 @@ func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreening, error) {
 		}
 	}
 
-	return allScreenings, nil
+	// Fetch TMDB data for all screenings
+	screeningsWithTMDB := s.fetchTMDBDataForScreenings(allScreenings)
+
+	return screeningsWithTMDB, nil
 }

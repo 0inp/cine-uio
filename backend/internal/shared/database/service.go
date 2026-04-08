@@ -64,20 +64,48 @@ func GetCinemaCompanyByName(name string) (*CinemaCompany, error) {
 }
 
 // SaveScrapedScreenings saves screenings from the scraper to the database
-func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
-	log.Printf("💾 Starting to save %d screenings to database...", len(screenings))
+func SaveScrapedScreenings(screenings interface{}) error {
+	var screeningsSlice []models.ScrapedScreening
+	var movieTMDBMap map[string]*models.MovieDetails
 
-	if len(screenings) == 0 {
+	// Handle different input types and extract TMDB data
+	switch v := screenings.(type) {
+	case []models.ScrapedScreening:
+		screeningsSlice = v
+	case []models.ScrapedScreeningWithTMDB:
+		// Extract TMDB data and convert to ScrapedScreening
+		for _, sw := range v {
+			screeningsSlice = append(screeningsSlice, sw.ScrapedScreening)
+			// Store TMDB data in a map for later use
+			if sw.TMDBDetails != nil {
+				if movieTMDBMap == nil {
+					movieTMDBMap = make(map[string]*models.MovieDetails)
+				}
+				movieTMDBMap[sw.MovieTitle] = sw.TMDBDetails
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported type for screenings: %T", screenings)
+	}
+
+	log.Printf("💾 Starting to save %d screenings to database...", len(screeningsSlice))
+
+	if len(screeningsSlice) == 0 {
 		fmt.Println("⚠️  No screenings to save - empty slice received")
 		return nil
 	}
 
-	for i, screening := range screenings {
+	for _, screening := range screeningsSlice {
 		var movie Movie
 		var cinema Cinema
 
 		// Get or create movie by title
-		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle})
+		var duration *int
+		if tmdbDetails, ok := movieTMDBMap[screening.MovieTitle]; ok && tmdbDetails.Runtime > 0 {
+			runtime := tmdbDetails.Runtime
+			duration = &runtime
+		}
+		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle, Duration: duration})
 		if result.Error != nil {
 			return fmt.Errorf("failed to get or create movie '%s': %w", screening.MovieTitle, result.Error)
 		}
@@ -112,9 +140,9 @@ func SaveScrapedScreenings(screenings []models.ScrapedScreening) error {
 			return fmt.Errorf("failed to create screening for %s: %w", screening.MovieTitle, result.Error)
 		}
 
-		log.Printf("📝 Saved screening %d/%d: %s at %s", i+1, len(screenings), screening.MovieTitle, screening.CinemaName)
+		// log.Printf("📝 Saved screening %d/%d: %s at %s", i+1, len(screeningsSlice), screening.MovieTitle, screening.CinemaName)
 	}
 
-	fmt.Printf("✅ Successfully saved %d screenings to database!\n", len(screenings))
+	fmt.Printf("✅ Successfully saved %d screenings to database!\n", len(screeningsSlice))
 	return nil
 }

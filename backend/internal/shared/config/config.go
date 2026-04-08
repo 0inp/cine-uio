@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 // Config holds application configuration
@@ -13,6 +15,7 @@ type Config struct {
 	APIAddress   string
 	LogLevel     string
 	Scraper      ScraperConfig
+	TMDBService  TMDBServiceConfig
 }
 
 // ScraperConfig holds scraper-specific configuration
@@ -21,8 +24,20 @@ type ScraperConfig struct {
 	Timeout     int
 }
 
-// LoadConfig loads configuration from environment variables with sensible defaults
+// TMDBServiceConfig holds TMDB service configuration.
+type TMDBServiceConfig struct {
+	APIKey string
+}
+
+// LoadConfig loads configuration from .env file and environment variables with sensible defaults
 func LoadConfig() *Config {
+	// Load .env file from the current directory
+	err := godotenv.Load()
+	if err != nil {
+		log.Printf("⚠️  No .env file found or error loading: %v", err)
+		log.Println("📋 Using environment variables and defaults")
+	}
+
 	config := &Config{
 		DatabasePath: getEnv("DATABASE_PATH", "cine-uio.db"),
 		APIAddress:   getEnv("API_ADDRESS", ":8080"),
@@ -30,6 +45,9 @@ func LoadConfig() *Config {
 		Scraper: ScraperConfig{
 			Concurrency: getEnvInt("SCRAPER_CONCURRENCY", 1),
 			Timeout:     getEnvInt("SCRAPER_TIMEOUT", 30),
+		},
+		TMDBService: TMDBServiceConfig{
+			APIKey: getEnv("TMDB_API_KEY", ""),
 		},
 	}
 

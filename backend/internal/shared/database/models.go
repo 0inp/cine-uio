@@ -29,6 +29,7 @@ type Cinema struct {
 type Movie struct {
 	BaseModel
 	Title      string      `gorm:"unique;not null"`
+	Duration   *int        `gorm:"default:null"` // Duration in minutes
 	Screenings []Screening `gorm:"foreignKey:MovieID"`
 }
 
