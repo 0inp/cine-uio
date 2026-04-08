@@ -1,10 +1,12 @@
 import { For } from "solid-js";
-interface DaysSliderProps {
+
+interface DaySliderProps {
   dates: Date[];
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
 }
-export default function DaysSlider(props: DaysSliderProps) {
+
+export default function DaysSlider(props: DaySliderProps) {
   // Helper function to format date
   function formatDate(date: Date): string {
     return date.toLocaleDateString('es-ES', {

@@ -1,10 +1,9 @@
 [tools]
 bun = "latest"
-biome = "latest"
 
 [tasks]
 dev = "bun run dev"
 build = "bun run build"
 preview = "bun run preview"
-format = "biome format --write"
-check = "biome check --apply"
+format = "bun format"
+check = "bun check"
