@@ -3,6 +3,12 @@ export interface Screening {
   date: string;
   language: string;
   time: string;
+  cinema: string;
+}
+
+export interface CinemaScreening {
+  cinema: string;
+  languages: OrganizedScreening[];
 }
 
 export interface OrganizedScreening {
@@ -25,7 +31,7 @@ export interface Movie extends BaseMovie {
 }
 
 export interface MovieWithScreenings extends BaseMovie {
-  screenings: OrganizedScreening[];
+  screenings: CinemaScreening[];
 }
 
 export interface TMDBConfig {

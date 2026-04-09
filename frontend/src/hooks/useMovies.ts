@@ -37,24 +37,35 @@ export function useMovies() {
 
     const filtered = rawMovies
       .map((movie): MovieWithScreenings => {
-        const screeningsByLanguage = new Map<string, string[]>();
+        // Group screenings by cinema first, then by language
+        const screeningsByCinema = new Map<string, Map<string, string[]>>();
 
         movie.screenings.forEach((screening) => {
           const screeningDateStr = screening.date.split('T')[0];
           if (screeningDateStr === selectedDateStr) {
-            if (!screeningsByLanguage.has(screening.language)) {
-              screeningsByLanguage.set(screening.language, []);
+            if (!screeningsByCinema.has(screening.cinema)) {
+              screeningsByCinema.set(screening.cinema, new Map<string, string[]>());
             }
-            screeningsByLanguage.get(screening.language)?.push(screening.time);
+            const cinemaLanguages = screeningsByCinema.get(screening.cinema);
+            if (!cinemaLanguages?.has(screening.language)) {
+              cinemaLanguages?.set(screening.language, []);
+            }
+            cinemaLanguages?.get(screening.language)?.push(screening.time);
           }
         });
 
-        const organizedScreenings = Array.from(screeningsByLanguage.entries())
-          .map(([language, times]) => ({
-            language,
-            times: times.sort() // Sort times chronologically
+        // Convert to the new cinema-based structure
+        const organizedScreenings = Array.from(screeningsByCinema.entries())
+          .map(([cinema, languagesMap]) => ({
+            cinema,
+            languages: Array.from(languagesMap.entries())
+              .map(([language, times]) => ({
+                language,
+                times: times.sort() // Sort times chronologically
+              }))
+              .sort((a, b) => a.language.localeCompare(b.language))
           }))
-          .sort((a, b) => a.language.localeCompare(b.language));
+          .sort((a, b) => a.cinema.localeCompare(b.cinema));
 
         return {
           ...movie,

@@ -10,12 +10,13 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// Screening represents a movie screening with date, time, and language information
+// Screening represents a movie screening with date, time, language, and cinema information
 // used in the API response
 type Screening struct {
 	Date     string `json:"date"`
 	Time     string `json:"time"`
 	Language string `json:"language"`
+	Cinema   string `json:"cinema"`
 }
 
 // Movie represents a movie with its associated screenings
@@ -46,12 +47,13 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 		}
 	}()
 
-	// Query to get movies with their screening times and TMDB data
+	// Query to get movies with their screening times, cinema info, and TMDB data
 	query := `
 		SELECT m.title, m.duration, m.overview, m.poster_path, m.backdrop_path,
-		       m.original_title, m.vote_average, st.date, st.time, st.language
+		       m.original_title, m.vote_average, st.date, st.time, st.language, c.name as cinema_name
 		FROM movies m
 		JOIN screening_times st ON m.id = st.movie_id
+		JOIN cinemas c ON st.cinema_id = c.id
 		ORDER BY m.title, st.date, st.time
 	`
 
@@ -69,14 +71,14 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 	// Group screenings by movie
 	moviesMap := make(map[string]*Movie)
 	for rows.Next() {
-		var title, date, time, language string
+		var title, date, time, language, cinemaName string
 		var duration sql.NullInt32
 		var overview sql.NullString
 		var posterPath sql.NullString
 		var backdropPath sql.NullString
 		var originalTitle sql.NullString
 		var voteAverage sql.NullFloat64
-		if err := rows.Scan(&title, &duration, &overview, &posterPath, &backdropPath, &originalTitle, &voteAverage, &date, &time, &language); err != nil {
+		if err := rows.Scan(&title, &duration, &overview, &posterPath, &backdropPath, &originalTitle, &voteAverage, &date, &time, &language, &cinemaName); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -128,6 +130,7 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 			Date:     date,
 			Time:     time,
 			Language: language,
+			Cinema:   cinemaName,
 		})
 	}
 

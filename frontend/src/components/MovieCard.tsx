@@ -1,7 +1,7 @@
 import { Component, For } from "solid-js";
 import { MovieWithScreenings } from "../types/movie";
 import { getBackdropUrl, getPosterUrl } from "../utils/tmdb";
-import ScreeningGroup from "./ScreeningGroup";
+import CinemaScreeningGroup from "./CinemaScreeningGroup";
 import MovieDetails from "./MovieDetails";
 
 interface MovieCardProps {
@@ -37,10 +37,10 @@ const MovieCard: Component<MovieCardProps> = (props) => {
           <div class="flex-1 flex flex-col">
             <MovieDetails movie={props.movie} />
 
-            {/* Screenings organized by language */}
+            {/* Screenings organized by cinema */}
             <div class="space-y-3 mt-4 flex-1">
               <For each={props.movie.screenings}>
-                {(screeningGroup) => <ScreeningGroup group={screeningGroup} />}
+                {(cinemaGroup) => <CinemaScreeningGroup group={cinemaGroup} />}
               </For>
             </div>
           </div>

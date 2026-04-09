@@ -7,7 +7,7 @@ export default function MoviesPage() {
   const { filteredMovies, dates, selectedDate, setSelectedDate, error, isLoading } = useMovies();
 
   return (
-    <main class="container mx-auto px-4 py-8 max-w-4xl">
+    <main class="container mx-auto px-4 py-8 max-w-5xl">
       <h1 class="text-4xl font-bold text-center mb-8 text-sky-700">cine-uio</h1>
 
       <DaysSlider
