@@ -21,9 +21,14 @@ type Screening struct {
 // Movie represents a movie with its associated screenings
 // used in the API response
 type Movie struct {
-	Title      string      `json:"title"`
-	Duration   *int        `json:"duration"` // Duration in minutes, nullable
-	Screenings []Screening `json:"screenings"`
+	Title         string      `json:"title"`
+	Duration      *int        `json:"duration"` // Duration in minutes, nullable
+	Overview      *string     `json:"overview"`
+	PosterPath    *string     `json:"poster_path"`
+	BackdropPath  *string     `json:"backdrop_path"`
+	OriginalTitle *string     `json:"original_title"`
+	VoteAverage   *float64    `json:"vote_average"`
+	Screenings    []Screening `json:"screenings"`
 }
 
 // MoviesHandler handles HTTP requests to the /api/movies endpoint
@@ -41,9 +46,10 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 		}
 	}()
 
-	// Query to get movies with their screening times and duration
+	// Query to get movies with their screening times and TMDB data
 	query := `
-		SELECT m.title, m.duration, st.date, st.time, st.language
+		SELECT m.title, m.duration, m.overview, m.poster_path, m.backdrop_path,
+		       m.original_title, m.vote_average, st.date, st.time, st.language
 		FROM movies m
 		JOIN screening_times st ON m.id = st.movie_id
 		ORDER BY m.title, st.date, st.time
@@ -65,7 +71,12 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 	for rows.Next() {
 		var title, date, time, language string
 		var duration sql.NullInt32
-		if err := rows.Scan(&title, &duration, &date, &time, &language); err != nil {
+		var overview sql.NullString
+		var posterPath sql.NullString
+		var backdropPath sql.NullString
+		var originalTitle sql.NullString
+		var voteAverage sql.NullFloat64
+		if err := rows.Scan(&title, &duration, &overview, &posterPath, &backdropPath, &originalTitle, &voteAverage, &date, &time, &language); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -76,9 +87,41 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 				durationValue := int(duration.Int32)
 				durationPtr = &durationValue
 			}
+
+			var overviewPtr *string
+			if overview.Valid {
+				overviewPtr = &overview.String
+			}
+
+			var posterPathPtr *string
+			if posterPath.Valid {
+				posterPathPtr = &posterPath.String
+			}
+
+			var backdropPathPtr *string
+			if backdropPath.Valid {
+				backdropPathPtr = &backdropPath.String
+			}
+
+			var originalTitlePtr *string
+			if originalTitle.Valid {
+				originalTitlePtr = &originalTitle.String
+			}
+
+			var voteAveragePtr *float64
+			if voteAverage.Valid {
+				voteAvgValue := voteAverage.Float64
+				voteAveragePtr = &voteAvgValue
+			}
+
 			moviesMap[title] = &Movie{
-				Title:    title,
-				Duration: durationPtr,
+				Title:         title,
+				Duration:      durationPtr,
+				Overview:      overviewPtr,
+				PosterPath:    posterPathPtr,
+				BackdropPath:  backdropPathPtr,
+				OriginalTitle: originalTitlePtr,
+				VoteAverage:   voteAveragePtr,
 			}
 		}
 		moviesMap[title].Screenings = append(moviesMap[title].Screenings, Screening{

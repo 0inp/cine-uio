@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
+	"time"
 
 	"scraper/internal/shared/config"
 	"scraper/internal/shared/models"
@@ -15,8 +17,10 @@ import (
 
 // TMDBService handles communication with The Movie Database API
 type TMDBService struct {
-	apiKey  string
-	baseURL string
+	apiKey      string
+	baseURL     string
+	configCache *models.TMDBConfigCache
+	cacheMutex  sync.Mutex
 }
 
 // NewTMDBService creates a new TMDB service instance
@@ -32,6 +36,9 @@ func NewTMDBService(cfg *config.Config) *TMDBService {
 	return &TMDBService{
 		apiKey:  apiKey,
 		baseURL: "https://api.themoviedb.org/3",
+		configCache: &models.TMDBConfigCache{
+			ExpiresAfter: 24 * time.Hour, // Cache for 1 day
+		},
 	}
 }
 
@@ -65,6 +72,76 @@ func (s *TMDBService) doRequest(method, url string, response interface{}) error 
 	}
 
 	return nil
+}
+
+// GetTMDBConfiguration fetches TMDB configuration and caches it
+func (s *TMDBService) GetTMDBConfiguration() (*models.TMDBConfiguration, error) {
+	s.cacheMutex.Lock()
+	defer s.cacheMutex.Unlock()
+
+	// Return cached config if it exists and hasn't expired
+	if s.configCache.Config != nil {
+		if time.Since(s.configCache.LastFetched) < s.configCache.ExpiresAfter {
+			return s.configCache.Config, nil
+		}
+	}
+
+	// Fetch fresh configuration
+	configURL := fmt.Sprintf("%s/configuration", s.baseURL)
+	var config models.TMDBConfiguration
+	if err := s.doRequest("GET", configURL, &config); err != nil {
+		return nil, fmt.Errorf("failed to fetch TMDB configuration: %w", err)
+	}
+
+	// Update cache
+	s.configCache.Config = &config
+	s.configCache.LastFetched = time.Now()
+
+	return &config, nil
+}
+
+// BuildTMDBImageURL constructs a full TMDB image URL using cached configuration
+func (s *TMDBService) BuildTMDBImageURL(path string, sizeType string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty image path")
+	}
+
+	config, err := s.GetTMDBConfiguration()
+	if err != nil {
+		return "", fmt.Errorf("failed to get TMDB configuration: %w", err)
+	}
+
+	var size string
+	switch sizeType {
+	case "poster":
+		// Use w500 as default poster size
+		size = "w500"
+		if len(config.Images.PosterSizes) > 0 {
+			// Find the closest to w500
+			for _, s := range config.Images.PosterSizes {
+				if s == "w500" {
+					size = s
+					break
+				}
+			}
+		}
+	case "backdrop":
+		// Use w1280 as default backdrop size
+		size = "w1280"
+		if len(config.Images.BackdropSizes) > 0 {
+			// Find the closest to w1280
+			for _, s := range config.Images.BackdropSizes {
+				if s == "w1280" {
+					size = s
+					break
+				}
+			}
+		}
+	default:
+		size = sizeType
+	}
+
+	return fmt.Sprintf("%s%s%s", config.Images.SecureBaseURL, size, path), nil
 }
 
 // GetMovieTMDBID searches for a movie by its Spanish title

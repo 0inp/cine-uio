@@ -8,20 +8,35 @@ import (
 	"time"
 
 	"scraper/internal/api/routes"
+	"scraper/internal/scraper"
+	"scraper/internal/shared/config"
 )
 
 // Server represents the API server
 type Server struct {
-	Addr string
+	Addr        string
+	TMDBService *scraper.TMDBService
+	Config      *config.Config
 }
 
 // NewServer creates a new API server instance
-func NewServer(addr string) *Server {
-	return &Server{Addr: addr}
+func NewServer(addr string, cfg *config.Config) *Server {
+	return &Server{
+		Addr:        addr,
+		Config:      cfg,
+		TMDBService: scraper.NewTMDBService(cfg),
+	}
 }
 
 // Start starts the API server with proper timeout configuration
 func (s *Server) Start() error {
+	// Initialize TMDB configuration cache
+	if _, err := s.TMDBService.GetTMDBConfiguration(); err != nil {
+		log.Printf("⚠️  Failed to initialize TMDB configuration cache: %v", err)
+	} else {
+		log.Printf("✅ TMDB configuration cache initialized")
+	}
+
 	// Set up routes
 	http.HandleFunc("/api/movies", routes.MoviesHandler)
 	http.HandleFunc("/health", routes.HealthHandler)

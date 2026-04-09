@@ -28,9 +28,14 @@ type Cinema struct {
 // Movie represents a movie that can be screened
 type Movie struct {
 	BaseModel
-	Title      string      `gorm:"unique;not null"`
-	Duration   *int        `gorm:"default:null"` // Duration in minutes
-	Screenings []Screening `gorm:"foreignKey:MovieID"`
+	Title         string      `gorm:"unique;not null"`
+	Duration      *int        `gorm:"default:null"` // Duration in minutes
+	Overview      *string     `gorm:"type:text;default:null"`
+	PosterPath    *string     `gorm:"default:null"`
+	BackdropPath  *string     `gorm:"default:null"`
+	OriginalTitle *string     `gorm:"default:null"`
+	VoteAverage   *float64    `gorm:"default:null"`
+	Screenings    []Screening `gorm:"foreignKey:MovieID"`
 }
 
 // Screening represents a screening time for a movie at a specific cinema

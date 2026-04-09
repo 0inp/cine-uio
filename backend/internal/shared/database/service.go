@@ -101,13 +101,76 @@ func SaveScrapedScreenings(screenings interface{}) error {
 
 		// Get or create movie by title
 		var duration *int
-		if tmdbDetails, ok := movieTMDBMap[screening.MovieTitle]; ok && tmdbDetails.Runtime > 0 {
-			runtime := tmdbDetails.Runtime
-			duration = &runtime
+		var overview *string
+		var posterPath *string
+		var backdropPath *string
+		var originalTitle *string
+		var voteAverage *float64
+
+		if tmdbDetails, ok := movieTMDBMap[screening.MovieTitle]; ok {
+			if tmdbDetails.Runtime > 0 {
+				runtime := tmdbDetails.Runtime
+				duration = &runtime
+			}
+			if tmdbDetails.Overview != "" {
+				overview = &tmdbDetails.Overview
+			}
+			if tmdbDetails.PosterPath != "" {
+				posterPath = &tmdbDetails.PosterPath
+			}
+			if tmdbDetails.BackdropPath != "" {
+				backdropPath = &tmdbDetails.BackdropPath
+			}
+			if tmdbDetails.OriginalTitle != "" {
+				originalTitle = &tmdbDetails.OriginalTitle
+			}
+			if tmdbDetails.VoteAverage > 0 {
+				voteAvg := tmdbDetails.VoteAverage
+				voteAverage = &voteAvg
+			}
 		}
-		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{Title: screening.MovieTitle, Duration: duration})
+		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{
+			Title:         screening.MovieTitle,
+			Duration:      duration,
+			Overview:      overview,
+			PosterPath:    posterPath,
+			BackdropPath:  backdropPath,
+			OriginalTitle: originalTitle,
+			VoteAverage:   voteAverage,
+		})
 		if result.Error != nil {
 			return fmt.Errorf("failed to get or create movie '%s': %w", screening.MovieTitle, result.Error)
+		}
+
+		// Update existing movie with new TMDB data if it wasn't just created
+		if result.RowsAffected == 0 {
+			if tmdbDetails, ok := movieTMDBMap[screening.MovieTitle]; ok {
+				updates := make(map[string]interface{})
+				if tmdbDetails.Runtime > 0 {
+					updates["duration"] = tmdbDetails.Runtime
+				}
+				if tmdbDetails.Overview != "" {
+					updates["overview"] = tmdbDetails.Overview
+				}
+				if tmdbDetails.PosterPath != "" {
+					updates["poster_path"] = tmdbDetails.PosterPath
+				}
+				if tmdbDetails.BackdropPath != "" {
+					updates["backdrop_path"] = tmdbDetails.BackdropPath
+				}
+				if tmdbDetails.OriginalTitle != "" {
+					updates["original_title"] = tmdbDetails.OriginalTitle
+				}
+				if tmdbDetails.VoteAverage > 0 {
+					updates["vote_average"] = tmdbDetails.VoteAverage
+				}
+
+				if len(updates) > 0 {
+					if err := DB.Model(&movie).Updates(updates).Error; err != nil {
+						log.Printf("⚠️  Failed to update TMDB data for movie '%s': %v", screening.MovieTitle, err)
+					}
+				}
+			}
 		}
 
 		// Get or create cinema by name and store ID

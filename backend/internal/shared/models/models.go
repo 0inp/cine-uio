@@ -27,6 +27,24 @@ type MovieDetails struct {
 	Runtime       int     `json:"runtime"` // Duration in minutes
 	Overview      string  `json:"overview"`
 	PosterPath    string  `json:"poster_path"`
+	BackdropPath  string  `json:"backdrop_path"`
 	ReleaseDate   string  `json:"release_date"`
 	VoteAverage   float64 `json:"vote_average"`
+}
+
+// TMDBConfiguration represents the response structure from TMDB configuration endpoint
+type TMDBConfiguration struct {
+	Images struct {
+		BaseURL       string   `json:"base_url"`
+		SecureBaseURL string   `json:"secure_base_url"`
+		BackdropSizes []string `json:"backdrop_sizes"`
+		PosterSizes   []string `json:"poster_sizes"`
+	} `json:"images"`
+}
+
+// TMDBConfigCache represents cached TMDB configuration with expiry
+type TMDBConfigCache struct {
+	Config       *TMDBConfiguration
+	LastFetched  time.Time
+	ExpiresAfter time.Duration
 }
