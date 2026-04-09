@@ -47,6 +47,7 @@ type Screening struct {
 	Date     time.Time `gorm:"not null"`
 	Time     string    `gorm:"not null"`
 	Language string    `gorm:"not null"`
+	URL      string    `gorm:"type:text;default:null"` // Actual URL to the cinema website for this screening
 }
 
 // TableName overrides for explicit table naming

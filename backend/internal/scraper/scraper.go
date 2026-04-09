@@ -34,7 +34,7 @@ func NewScraper(logger *logger.Logger, cfg *config.Config) (*Scraper, context.Ca
 }
 
 // scrapeScreeningTimesFromHTML scrapes the screening times from HTML for a specific date
-func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle string, cinema database.Cinema, date time.Time) ([]models.ScrapedScreening, error) {
+func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle string, cinema database.Cinema, date time.Time, movieURL string) ([]models.ScrapedScreening, error) {
 	var screenings []models.ScrapedScreening
 
 	// Find all session type containers
@@ -98,6 +98,7 @@ func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle
 						Date:       dateOnly, // Use date-only value
 						Time:       time,
 						Language:   language,
+						URL:        movieURL, // Store the actual cinema website URL
 					}
 					screenings = append(screenings, screening)
 					s.Logger.Debug("      ✅ Scraped: %s at %s on %s (Language: %s)", movieTitle, time, dateOnly.Format("2006-01-02"), language)
@@ -184,7 +185,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 		}
 
 		// Scrape screenings for this specific day
-		dayScreenings, err := s.scrapeScreeningTimesFromHTML(doc, movieTitle, cinema, currentDate)
+		dayScreenings, err := s.scrapeScreeningTimesFromHTML(doc, movieTitle, cinema, currentDate, movieURL)
 		if err != nil {
 			s.Logger.Warn("    ⚠ Error scraping screenings for day %d: %v", dayIndex, err)
 			continue

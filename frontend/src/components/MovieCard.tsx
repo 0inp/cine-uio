@@ -26,11 +26,11 @@ const MovieCard: Component<MovieCardProps> = (props) => {
           {/* Poster Image - Only visible on laptop and desktop (769px+) */}
           {props.movie.poster_path && (
             <div class="flex-shrink-0 w-full md:w-48 mx-auto md:mx-0 hidden md:block">
-               <img
-                 src={getPosterUrl(props.movie.poster_path)}
-                 alt={props.movie.spanish_title || props.movie.scraped_title}
-                 class="w-full h-auto rounded-lg shadow-md object-cover aspect-[2/3]"
-               />
+              <img
+                src={getPosterUrl(props.movie.poster_path)}
+                alt={props.movie.spanish_title || props.movie.scraped_title}
+                class="w-full h-auto rounded-lg shadow-md object-cover aspect-[2/3]"
+              />
             </div>
           )}
 
@@ -43,7 +43,13 @@ const MovieCard: Component<MovieCardProps> = (props) => {
         {/* Second Row: Screenings organized by cinema */}
         <div class="space-y-4">
           <For each={props.movie.screenings}>
-            {(cinemaGroup) => <CinemaScreeningGroup group={cinemaGroup} />}
+            {(cinemaGroup) => {
+              return (
+                <CinemaScreeningGroup
+                  group={cinemaGroup}
+                />
+              );
+            }}
           </For>
         </div>
       </div>

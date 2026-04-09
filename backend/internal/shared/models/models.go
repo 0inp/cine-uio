@@ -12,6 +12,7 @@ type ScrapedScreening struct {
 	Date       time.Time // Date of the screening
 	Time       string    // Time of the screening
 	Language   string    // Language of the screening
+	URL        string    // Actual URL to the cinema website for this screening
 }
 
 // ScrapedScreeningWithTMDB extends ScrapedScreening with TMDB data

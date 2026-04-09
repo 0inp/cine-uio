@@ -13,9 +13,20 @@ const ScreeningGroup: Component<ScreeningGroupProps> = (props) => {
       </div>
       <div class="flex flex-wrap gap-2">
         <For each={props.group.times}>
-          {(time) => (
-            <span class="px-3 py-1 bg-white rounded border text-sm text-gray-600 shadow-sm">{time}</span>
-          )}
+          {(time) => {
+            // Use the URL from the API (stored during scraping)
+            const screeningUrl = props.group.url || "#";
+            return (
+              <a
+                href={screeningUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="px-3 py-1 bg-white rounded border text-sm text-gray-600 shadow-sm hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                {time}
+              </a>
+            );
+          }}
         </For>
       </div>
     </div>

@@ -4,6 +4,7 @@ export interface Screening {
   language: string;
   time: string;
   cinema: string;
+  url?: string;
 }
 
 export interface CinemaScreening {
@@ -14,6 +15,7 @@ export interface CinemaScreening {
 export interface OrganizedScreening {
   language: string;
   times: string[];
+  url?: string; // URL to the cinema website for this screening group
 }
 
 export interface BaseMovie {

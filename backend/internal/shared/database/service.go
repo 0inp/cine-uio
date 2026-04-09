@@ -204,6 +204,7 @@ func SaveScrapedScreenings(screenings interface{}) error {
 			Date:     screening.Date,
 			Time:     screening.Time,
 			Language: screening.Language,
+			URL:      screening.URL,
 		}
 
 		result = DB.Create(&dbScreening)

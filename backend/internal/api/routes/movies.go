@@ -17,6 +17,7 @@ type Screening struct {
 	Time     string `json:"time"`
 	Language string `json:"language"`
 	Cinema   string `json:"cinema"`
+	URL      string `json:"url"`
 }
 
 // Movie represents a movie with its associated screenings
@@ -51,7 +52,7 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 	// Query to get movies with their screening times, cinema info, and TMDB data
 	query := `
 		SELECT m.scraped_title, m.spanish_title, m.duration, m.overview, m.poster_path, m.backdrop_path,
-		       m.original_title, m.vote_average, st.date, st.time, st.language, c.name as cinema_name
+		       m.original_title, m.vote_average, st.date, st.time, st.language, c.name as cinema_name, st.url
 		FROM movies m
 		JOIN screening_times st ON m.id = st.movie_id
 		JOIN cinemas c ON st.cinema_id = c.id
@@ -72,7 +73,7 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 	// Group screenings by movie
 	moviesMap := make(map[string]*Movie)
 	for rows.Next() {
-		var scrapedTitle, date, time, language, cinemaName string
+		var scrapedTitle, date, time, language, cinemaName, url string
 		var spanishTitle sql.NullString
 		var duration sql.NullInt32
 		var overview sql.NullString
@@ -80,7 +81,7 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 		var backdropPath sql.NullString
 		var originalTitle sql.NullString
 		var voteAverage sql.NullFloat64
-		if err := rows.Scan(&scrapedTitle, &spanishTitle, &duration, &overview, &posterPath, &backdropPath, &originalTitle, &voteAverage, &date, &time, &language, &cinemaName); err != nil {
+		if err := rows.Scan(&scrapedTitle, &spanishTitle, &duration, &overview, &posterPath, &backdropPath, &originalTitle, &voteAverage, &date, &time, &language, &cinemaName, &url); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -139,6 +140,7 @@ func MoviesHandler(w http.ResponseWriter, _ *http.Request) {
 			Time:     time,
 			Language: language,
 			Cinema:   cinemaName,
+			URL:      url,
 		})
 	}
 

@@ -29,9 +29,9 @@ export default function MoviesPage() {
         ) : filteredMovies().length === 0 ? (
           <div class="text-center py-8 text-gray-500">No movies available for selected date</div>
         ) : (
-          <For each={filteredMovies()}>
-            {(movie) => <MovieCard movie={movie} />}
-          </For>
+           <For each={filteredMovies()}>
+             {(movie) => <MovieCard movie={movie} />}
+           </For>
         )}
       </div>
     </main>

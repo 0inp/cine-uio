@@ -37,20 +37,23 @@ export function useMovies() {
 
     const filtered = rawMovies
       .map((movie): MovieWithScreenings => {
-        // Group screenings by cinema first, then by language
-        const screeningsByCinema = new Map<string, Map<string, string[]>>();
+        // Group screenings by cinema first, then by language, preserving URLs
+        const screeningsByCinema = new Map<string, Map<string, {time: string, url?: string}[]>>();
 
         movie.screenings.forEach((screening) => {
           const screeningDateStr = screening.date.split('T')[0];
           if (screeningDateStr === selectedDateStr) {
             if (!screeningsByCinema.has(screening.cinema)) {
-              screeningsByCinema.set(screening.cinema, new Map<string, string[]>());
+              screeningsByCinema.set(screening.cinema, new Map<string, {time: string, url?: string}[]>());
             }
             const cinemaLanguages = screeningsByCinema.get(screening.cinema);
             if (!cinemaLanguages?.has(screening.language)) {
               cinemaLanguages?.set(screening.language, []);
             }
-            cinemaLanguages?.get(screening.language)?.push(screening.time);
+            cinemaLanguages?.get(screening.language)?.push({
+              time: screening.time,
+              url: screening.url
+            });
           }
         });
 
@@ -59,9 +62,10 @@ export function useMovies() {
           .map(([cinema, languagesMap]) => ({
             cinema,
             languages: Array.from(languagesMap.entries())
-              .map(([language, times]) => ({
+              .map(([language, screenings]) => ({
                 language,
-                times: times.sort() // Sort times chronologically
+                times: screenings.map(s => s.time).sort(), // Sort times chronologically
+                url: screenings[0]?.url // Use URL from first screening (all same language screenings should have same URL)
               }))
               .sort((a, b) => a.language.localeCompare(b.language))
           }))
