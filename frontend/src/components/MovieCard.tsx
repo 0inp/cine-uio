@@ -14,7 +14,7 @@ const MovieCard: Component<MovieCardProps> = (props) => {
       class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow relative"
       style={
         props.movie.backdrop_path ? {
-          'background-image': `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url(${getBackdropUrl(props.movie.backdrop_path)})`,
+          'background-image': `linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url(${getBackdropUrl(props.movie.backdrop_path)})`,
           'background-size': 'cover',
           'background-position': 'center'
         } : {}
@@ -25,11 +25,11 @@ const MovieCard: Component<MovieCardProps> = (props) => {
           {/* Poster Image - Left Column */}
           {props.movie.poster_path && (
             <div class="flex-shrink-0 w-full md:w-48">
-              <img
-                src={getPosterUrl(props.movie.poster_path)}
-                alt={props.movie.title}
-                class="w-full h-auto rounded-lg shadow-md object-cover aspect-[2/3]"
-              />
+               <img
+                 src={getPosterUrl(props.movie.poster_path)}
+                 alt={props.movie.spanish_title || props.movie.scraped_title}
+                 class="w-full h-auto rounded-lg shadow-md object-cover aspect-[2/3]"
+               />
             </div>
           )}
 

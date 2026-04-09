@@ -28,12 +28,13 @@ type Cinema struct {
 // Movie represents a movie that can be screened
 type Movie struct {
 	BaseModel
-	Title         string      `gorm:"unique;not null"`
-	Duration      *int        `gorm:"default:null"` // Duration in minutes
+	ScrapedTitle  string      `gorm:"unique;not null"` // Title scraped from cinema websites
+	SpanishTitle  *string     `gorm:"default:null"`    // Spanish title from TMDB
+	OriginalTitle *string     `gorm:"default:null"`    // Original title from TMDB
+	Duration      *int        `gorm:"default:null"`    // Duration in minutes
 	Overview      *string     `gorm:"type:text;default:null"`
 	PosterPath    *string     `gorm:"default:null"`
 	BackdropPath  *string     `gorm:"default:null"`
-	OriginalTitle *string     `gorm:"default:null"`
 	VoteAverage   *float64    `gorm:"default:null"`
 	Screenings    []Screening `gorm:"foreignKey:MovieID"`
 }

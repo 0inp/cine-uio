@@ -10,8 +10,8 @@ const MovieDetails: Component<MovieDetailsProps> = (props) => {
   return (
     <div class="mb-4">
       <h2 class="text-xl font-semibold text-white border-b border-gray-400 pb-2 mb-2">
-        {props.movie.title}
-        {props.movie.original_title && props.movie.original_title !== props.movie.title && (
+        {props.movie.spanish_title || props.movie.scraped_title}
+        {props.movie.original_title && props.movie.spanish_title && props.movie.original_title !== props.movie.spanish_title && (
           <span class="text-sm font-normal text-gray-300 ml-2">
             ({props.movie.original_title})
           </span>

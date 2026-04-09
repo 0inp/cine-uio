@@ -104,6 +104,7 @@ func SaveScrapedScreenings(screenings interface{}) error {
 		var overview *string
 		var posterPath *string
 		var backdropPath *string
+		var spanishTitle *string
 		var originalTitle *string
 		var voteAverage *float64
 
@@ -121,6 +122,9 @@ func SaveScrapedScreenings(screenings interface{}) error {
 			if tmdbDetails.BackdropPath != "" {
 				backdropPath = &tmdbDetails.BackdropPath
 			}
+			if tmdbDetails.Title != "" {
+				spanishTitle = &tmdbDetails.Title
+			}
 			if tmdbDetails.OriginalTitle != "" {
 				originalTitle = &tmdbDetails.OriginalTitle
 			}
@@ -129,8 +133,9 @@ func SaveScrapedScreenings(screenings interface{}) error {
 				voteAverage = &voteAvg
 			}
 		}
-		result := DB.Where("title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{
-			Title:         screening.MovieTitle,
+		result := DB.Where("scraped_title = ?", screening.MovieTitle).FirstOrCreate(&movie, Movie{
+			ScrapedTitle:  screening.MovieTitle,
+			SpanishTitle:  spanishTitle,
 			Duration:      duration,
 			Overview:      overview,
 			PosterPath:    posterPath,
@@ -157,6 +162,9 @@ func SaveScrapedScreenings(screenings interface{}) error {
 				}
 				if tmdbDetails.BackdropPath != "" {
 					updates["backdrop_path"] = tmdbDetails.BackdropPath
+				}
+				if tmdbDetails.Title != "" {
+					updates["spanish_title"] = tmdbDetails.Title
 				}
 				if tmdbDetails.OriginalTitle != "" {
 					updates["original_title"] = tmdbDetails.OriginalTitle

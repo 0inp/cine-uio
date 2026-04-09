@@ -17,12 +17,13 @@ export interface OrganizedScreening {
 }
 
 export interface BaseMovie {
-  title: string;
-  duration?: number; // Duration in minutes
+  scraped_title: string;   // Title scraped from cinema websites
+  spanish_title?: string;  // Spanish title from TMDB
+  original_title?: string; // Original title from TMDB
+  duration?: number;       // Duration in minutes
   overview?: string;
   poster_path?: string;
   backdrop_path?: string;
-  original_title?: string;
   vote_average?: number;
 }
 

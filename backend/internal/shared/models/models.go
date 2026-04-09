@@ -22,7 +22,7 @@ type ScrapedScreeningWithTMDB struct {
 
 // MovieDetails represents the response structure from TMDB movie details endpoint
 type MovieDetails struct {
-	Title         string  `json:"title"`
+	Title         string  `json:"title"` // Spanish title when language=es-ES
 	OriginalTitle string  `json:"original_title"`
 	Runtime       int     `json:"runtime"` // Duration in minutes
 	Overview      string  `json:"overview"`
