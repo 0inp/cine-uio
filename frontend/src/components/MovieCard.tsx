@@ -20,11 +20,12 @@ const MovieCard: Component<MovieCardProps> = (props) => {
         } : {}
       }
     >
-      <div class="p-6">
-        <div class="flex flex-col md:flex-row gap-6">
-          {/* Poster Image - Left Column */}
+      <div class="p-4 sm:p-6">
+        {/* First Row: Poster + Movie Information (side-by-side on larger screens) */}
+        <div class="flex flex-col md:flex-row gap-6 mb-6">
+          {/* Poster Image - Only visible on laptop and desktop (769px+) */}
           {props.movie.poster_path && (
-            <div class="flex-shrink-0 w-full md:w-48">
+            <div class="flex-shrink-0 w-full md:w-48 mx-auto md:mx-0 hidden md:block">
                <img
                  src={getPosterUrl(props.movie.poster_path)}
                  alt={props.movie.spanish_title || props.movie.scraped_title}
@@ -33,17 +34,17 @@ const MovieCard: Component<MovieCardProps> = (props) => {
             </div>
           )}
 
-          {/* Movie Details - Right Column */}
-          <div class="flex-1 flex flex-col">
+          {/* Movie Details - Full width on mobile, side-by-side on larger screens */}
+          <div class="flex-1">
             <MovieDetails movie={props.movie} />
-
-            {/* Screenings organized by cinema */}
-            <div class="space-y-3 mt-4 flex-1">
-              <For each={props.movie.screenings}>
-                {(cinemaGroup) => <CinemaScreeningGroup group={cinemaGroup} />}
-              </For>
-            </div>
           </div>
+        </div>
+
+        {/* Second Row: Screenings organized by cinema */}
+        <div class="space-y-4">
+          <For each={props.movie.screenings}>
+            {(cinemaGroup) => <CinemaScreeningGroup group={cinemaGroup} />}
+          </For>
         </div>
       </div>
     </div>
