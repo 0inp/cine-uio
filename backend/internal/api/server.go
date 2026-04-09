@@ -39,6 +39,7 @@ func (s *Server) Start() error {
 
 	// Set up routes
 	http.HandleFunc("/api/movies", routes.MoviesHandler)
+	http.HandleFunc("/api/tmdb-config", routes.TMDBConfigHandler)
 	http.HandleFunc("/health", routes.HealthHandler)
 
 	// Create HTTP server with timeout configuration
