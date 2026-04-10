@@ -15,18 +15,17 @@
     "@solidjs/router": "^0.15.3",
     "@solidjs/start": "2.0.0-alpha.2",
     "@solidjs/vite-plugin-nitro-2": "^0.1.0",
-    "@unocss/preset-wind4": "^66.5.2",
-    "@unocss/reset": "^66.5.2",
+    "@unocss/preset-wind3": "^66.6.8",
     "better-sqlite3": "12.8.0",
     "solid-js": "^1.9.9",
-    "unocss": "^66.5.2",
+    "unocss": "^66.6.8",
     "vite": "^7.0.0"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
-    "baseline-browser-mapping": "^2.10.16",
+    "baseline-browser-mapping": "^2.10.17",
     "biome": "^0.3.3",
     "typescript": "^6.0.2"
   }

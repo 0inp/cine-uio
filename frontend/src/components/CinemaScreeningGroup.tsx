@@ -65,9 +65,9 @@ const CinemaScreeningGroup: Component<CinemaScreeningGroupProps> = (props) => {
   });
 
   return (
-    <div class="bg-white bg-opacity-90 rounded-lg p-3">
+    <div class="screening-group rounded-lg p-3">
       <div class="flex items-center mb-2">
-        <span class="font-medium text-gray-800 uppercase text-sm">{props.group.cinema}</span>
+         <span class="font-medium uppercase text-sm">{props.group.cinema}</span>
       </div>
 
       <div ref={setContainerRef} class="ml-4">
@@ -76,7 +76,7 @@ const CinemaScreeningGroup: Component<CinemaScreeningGroupProps> = (props) => {
             <For each={props.group.languages}>
               {(languageGroup, index) => (
                 <>
-                  <span class="text-gray-600 text-sm whitespace-nowrap mr-1">
+                   <span class="text-sm whitespace-nowrap mr-1">
                     {languageGroup.language}:
                   </span>
                    <For each={languageGroup.times}>
@@ -84,12 +84,12 @@ const CinemaScreeningGroup: Component<CinemaScreeningGroupProps> = (props) => {
                        // Use the URL from the API (stored during scraping)
                        const screeningUrl = languageGroup.url || "#";
                        return (
-                         <a
-                           href={screeningUrl}
-                           target="_blank"
-                           rel="noopener noreferrer"
-                           class="px-2 py-1 bg-white rounded border text-xs text-gray-600 shadow-sm hover:bg-gray-50 transition-colors cursor-pointer"
-                         >
+                      <a
+                       href={screeningUrl}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       class="px-2 py-1 bg-gray-800 rounded border text-xs shadow-sm hover:bg-gray-700 transition-colors cursor-pointer screening-time"
+                     >
                            {time}
                          </a>
                        );
@@ -106,19 +106,19 @@ const CinemaScreeningGroup: Component<CinemaScreeningGroupProps> = (props) => {
             <For each={props.group.languages}>
               {(languageGroup) => (
                 <div class="flex items-start gap-2">
-                  <span class="text-gray-600 text-sm whitespace-nowrap pt-1">{languageGroup.language}:</span>
+                                     <span class="text-sm whitespace-nowrap pt-1">{languageGroup.language}:</span>
                   <div class="flex flex-wrap gap-1">
                      <For each={languageGroup.times}>
                        {(time) => {
                          // Use the URL from the API (stored during scraping)
                          const screeningUrl = languageGroup.url || "#";
                          return (
-                           <a
-                             href={screeningUrl}
-                             target="_blank"
-                             rel="noopener noreferrer"
-                             class="px-2 py-1 bg-white rounded border text-xs text-gray-600 shadow-sm hover:bg-gray-50 transition-colors cursor-pointer"
-                           >
+                            <a
+                              href={screeningUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="px-2 py-1 bg-gray-800 rounded border text-xs shadow-sm hover:bg-gray-700 transition-colors cursor-pointer screening-time"
+                            >
                              {time}
                            </a>
                          );
