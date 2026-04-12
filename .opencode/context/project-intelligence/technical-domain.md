@@ -26,6 +26,7 @@
 | SQLite Driver | v1.6.0 | SQLite database connectivity |
 
 ## Code Patterns
+
 ### API Endpoint
 *(No specific API pattern provided - using Go standard patterns)*
 
@@ -38,6 +39,48 @@
 - Implement proper error handling and retries
 - Use context-based cancellation for cleanup
 - Handle dynamic content with appropriate waits
+
+#### Scraping Best Practices (Updated 2026-04-12)
+- **Dynamic Waiting**: Use `chromedp.WaitVisible()` instead of fixed `Sleep()` delays
+- **Retry Logic**: Implement 2-3 retry attempts for transient failures
+- **Content Verification**: Verify active state and content presence before parsing
+- **Targeted Parsing**: Parse only relevant DOM sections, not entire page
+- **Early Exit**: Detect and skip empty states (`.EmptyState`) immediately
+- **Active Day Verification**: Confirm correct day loaded after navigation
+- **Multi-level Validation**: Check container existence, content presence, and element availability
+
+#### Day Navigation Pattern
+```go
+// 1. Click day button with retry logic
+for retry := 0; retry <= maxRetries; retry++ {
+    err = chromedp.Run(s.Ctx,
+        chromedp.Click(fmt.Sprintf(`.slick-slide[data-index="%d"]`, dayIndex)),
+        chromedp.WaitVisible(`.MovieDetail__content__session-type`),
+        chromedp.WaitNotPresent(`div[class*="loading"]`),
+    )
+
+    // 2. Verify correct day is active
+    var activeDayIndex int
+    chromedp.Evaluate(`parseInt(document.querySelector('.slick-slide.slick-active')?.getAttribute('data-index') || '-1')`, &activeDayIndex)
+
+    // 3. Retry if mismatch, succeed if correct
+    if activeDayIndex == dayIndex {
+        success = true
+        break
+    }
+}
+```
+
+#### EmptyState Detection Pattern
+```go
+// Check for EmptyState before processing
+var hasEmptyState bool
+chromedp.Evaluate(`!!document.querySelector('.MovieDetail__content__session-type .EmptyState')`, &hasEmptyState)
+if hasEmptyState {
+    logger.Info("Skipping: EmptyState detected (no screenings)")
+    return nil, nil // Early exit
+}
+```
 
 ## Naming Conventions
 | Type | Convention | Example |
