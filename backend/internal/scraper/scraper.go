@@ -130,7 +130,13 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 		chromedp.WaitVisible("body", chromedp.ByQuery),
 		// Wait for the slick slider to be ready
 		chromedp.WaitVisible(`.MovieDetail__content__days`, chromedp.ByQuery),
-		chromedp.Sleep(2*time.Second), // Wait for initial content to load
+		// Wait for slick slider to be initialized
+		chromedp.WaitVisible(`.slick-initialized`, chromedp.ByQuery),
+		// Wait for session content instead of fixed sleep
+		chromedp.WaitVisible(`.MovieDetail__content__session-type`, chromedp.ByQuery),
+		// Wait for actual session content to load
+		chromedp.WaitVisible(`.SessionType, .sc-10d01b1b-0`, chromedp.ByQuery),
+		chromedp.Sleep(600*time.Millisecond), // Short fallback sleep
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error navigating to movie page: %w", err)
@@ -150,6 +156,18 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 		}
 	}
 	s.Logger.Debug("  → Movie: %s", movieTitle)
+
+	// Early check for EmptyState to potentially skip entire movie
+	var movieHasEmptyState bool
+	err = chromedp.Run(s.Ctx,
+		chromedp.Evaluate(`!!document.querySelector('.MovieDetail__content__session-type .EmptyState')`, &movieHasEmptyState),
+	)
+	if err != nil {
+		s.Logger.Warn("  ⚠ Error checking movie EmptyState: %v", err)
+	} else if movieHasEmptyState {
+		s.Logger.Info("  ℹ Skipping movie: EmptyState detected (no screenings available)")
+		return screenings, nil
+	}
 
 	// Check the data-index attribute of the active slick slide
 	var activeIndexStr string
@@ -197,15 +215,64 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 		s.Logger.Debug("  → Processing day %d", dayIndex)
 
 		if dayIndex > 0 {
-			// Click on the day button for days 1-6
+			// Click on the day button for days 1-6 with retry logic
 			s.Logger.Debug("  → Clicking on day %d (data-index=%d)", dayIndex, dayIndex)
-			err = chromedp.Run(s.Ctx,
-				chromedp.Click(fmt.Sprintf(`.slick-slide[data-index="%d"]`, dayIndex), chromedp.ByQuery),
-				chromedp.Sleep(3*time.Second), // Wait for XHR to complete
-			)
-			if err != nil {
-				s.Logger.Warn("    ⚠ Error clicking day %d: %v", dayIndex, err)
-				continue
+
+			maxRetries := 2
+			success := false
+			for retry := 0; retry <= maxRetries; retry++ {
+				if retry > 0 {
+					s.Logger.Debug("    → Retry %d/%d for day %d", retry, maxRetries, dayIndex)
+				}
+
+				err = chromedp.Run(s.Ctx,
+					chromedp.Click(fmt.Sprintf(`.slick-slide[data-index="%d"]`, dayIndex), chromedp.ByQuery),
+					// Improved waiting strategy for day transitions
+					chromedp.WaitVisible(`.MovieDetail__content__session-type`, chromedp.ByQuery),
+					// Wait for specific content to ensure full load
+					chromedp.WaitNotPresent(`div[class*="loading"][style*="display: block"]`, chromedp.ByQuery),
+					// Additional check for session content
+					chromedp.WaitVisible(`.SessionType, .sc-10d01b1b-0`, chromedp.ByQuery),
+					chromedp.Sleep(800*time.Millisecond), // Slightly longer fallback for reliability
+				)
+
+				if err != nil {
+					if retry < maxRetries {
+						continue // Try again
+					}
+					s.Logger.Warn("    ⚠ Error clicking day %d after %d retries: %v", dayIndex, maxRetries, err)
+					break
+				}
+
+				// Verify the active day changed correctly
+				var activeDayIndex int
+				err = chromedp.Run(s.Ctx,
+					chromedp.Evaluate(`parseInt(document.querySelector('.slick-slide.slick-active')?.getAttribute('data-index') || '-1')`, &activeDayIndex),
+				)
+				if err != nil {
+					if retry < maxRetries {
+						continue // Try again
+					}
+					s.Logger.Warn("    ⚠ Could not verify active day after clicking day %d: %v", dayIndex, err)
+					break
+				}
+
+				if activeDayIndex == dayIndex {
+					s.Logger.Debug("    ✅ Successfully navigated to day %d", dayIndex)
+					success = true
+					break
+				}
+				s.Logger.Warn("    ⚠ Active day mismatch on attempt %d: expected %d, got %d", retry+1, dayIndex, activeDayIndex)
+				if retry < maxRetries {
+					// Try to click again
+					continue
+				}
+				s.Logger.Warn("    ⚠ Failed to navigate to day %d after %d attempts", dayIndex, maxRetries)
+				break
+			}
+
+			if !success {
+				continue // Skip this day if we couldn't navigate to it
 			}
 		}
 
@@ -215,10 +282,26 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 			currentDate = currentDate.AddDate(0, 0, dayIndex)
 		}
 
-		// Parse the page to get screenings for this day
+		// Check for EmptyState before parsing (early exit optimization)
+		var hasEmptyState bool
+		err = chromedp.Run(s.Ctx,
+			chromedp.Evaluate(`!!document.querySelector('.MovieDetail__content__session-type .EmptyState')`, &hasEmptyState),
+		)
+		if err != nil {
+			s.Logger.Warn("    ⚠ Error checking EmptyState for day %d: %v", dayIndex, err)
+			continue
+		}
+		if hasEmptyState {
+			s.Logger.Info("    ℹ No screening times available for day %d (EmptyState detected)", dayIndex)
+			continue
+		}
+
+		// Parse only the relevant section instead of entire body (optimization)
 		var dayHTML string
 		err = chromedp.Run(s.Ctx,
-			chromedp.OuterHTML("body", &dayHTML, chromedp.ByQuery),
+			// Wait again to ensure content is stable before parsing
+			chromedp.WaitVisible(`.ScheduleSession, .sc-870fb5d6-0`, chromedp.ByQuery),
+			chromedp.OuterHTML(".MovieDetail__content__session-type", &dayHTML, chromedp.ByQuery),
 		)
 		if err != nil {
 			s.Logger.Warn("    ⚠ Error getting HTML for day %d: %v", dayIndex, err)
@@ -232,10 +315,24 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 			continue
 		}
 
+		// Verify we got actual content (not just empty container)
+		sessionContent := doc.Find(".MovieDetail__content__session-type")
+		if sessionContent.Length() == 0 {
+			s.Logger.Warn("    ⚠ No session content found for day %d - may not have loaded properly", dayIndex)
+			continue
+		}
+
 		// Check for EmptyState before processing
 		emptyState := doc.Find(".MovieDetail__content__session-type .EmptyState")
 		if emptyState.Length() > 0 {
 			s.Logger.Info("    ℹ No screening times available for day %d (EmptyState detected)", dayIndex)
+			continue
+		}
+
+		// Additional verification: check for actual session elements
+		sessionElements := doc.Find(".SessionType, .sc-10d01b1b-0, .ScheduleSession, .sc-870fb5d6-0")
+		if sessionElements.Length() == 0 {
+			s.Logger.Warn("    ⚠ No session elements found for day %d - content may not have loaded", dayIndex)
 			continue
 		}
 
@@ -359,8 +456,9 @@ func (s *Scraper) ScrapeMulticines() ([]models.ScrapedScreeningWithTMDB, error) 
 			var movieURL string
 			err = chromedp.Run(s.Ctx,
 				chromedp.Evaluate(fmt.Sprintf(`document.querySelectorAll('.MovieCard')[%d].click()`, i), nil),
-				chromedp.Sleep(3*time.Second), // Wait for navigation
-				chromedp.WaitVisible("body", chromedp.ByQuery),
+				// Replace fixed sleep with dynamic waiting
+				chromedp.WaitVisible(".MovieDetail__content__session-type", chromedp.ByQuery),
+				chromedp.Sleep(500*time.Millisecond), // Short fallback
 				chromedp.Location(&movieURL),
 			)
 			if err != nil {
