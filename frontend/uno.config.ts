@@ -46,7 +46,7 @@ export default defineConfig({
         blur: 'rgba(252, 251, 224, 0.3)', // Beige blur for hover effects
       },
       screening: {
-        bg: '#1a1a1a', // Dark background for screening groups
+        bg: '#181616', // Dark background for screening groups
         text: '#fcfbe0', // Beige popcorn text
       }
     }

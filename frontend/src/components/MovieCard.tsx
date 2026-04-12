@@ -10,16 +10,22 @@ interface MovieCardProps {
 
 const MovieCard: Component<MovieCardProps> = (props) => {
   return (
-    <div class="relative group rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-[0_0_0_2px_#fcfbe0]">
-      <div
-        class="relative z-10 bg-background-light/90 backdrop-blur-sm rounded-lg p-4 space-y-6"
-        style={{
-          'background-image': props.movie.backdrop_path ? `linear-gradient(rgba(0,0,0,0.9), rgba(0,0,0,0.9)), url(${getBackdropUrl(props.movie.backdrop_path)})` : 'none',
-          'background-size': 'cover',
-          'background-position': 'center'
-        }}
-      >
-        {/* First Row: Poster + Movie Information (side-by-side on larger screens) */}
+    <div class="relative group rounded-lg shadow-md overflow-hidden transition-all duration-300 hover:shadow-[0_0_0_1px_#fcfbe0]">
+      {/* Background image layer (blurred) */}
+      {props.movie.backdrop_path && (
+        <div
+          class="absolute inset-0 z-10"
+          style={{
+            'background-image': `url(${getBackdropUrl(props.movie.backdrop_path)})`,
+            'background-size': 'cover',
+            'background-position': 'center',
+          }}
+        />
+      )}
+
+      {/* Content layer (not blurred) */}
+      <div class="relative z-20 bg-background-light/80 backdrop-blur-xs rounded-lg p-4 space-y-6">
+        {/* First Row: Poster + Movie Information */}
         <div class="flex flex-col md:flex-row gap-6">
           {/* Poster Image - Only visible on laptop and desktop (769px+) */}
           {props.movie.poster_path && (
@@ -32,7 +38,7 @@ const MovieCard: Component<MovieCardProps> = (props) => {
             </div>
           )}
 
-          {/* Movie Details - Full width on mobile, side-by-side on larger screens */}
+          {/* Movie Details */}
           <div class="flex-1">
             <MovieDetails movie={props.movie} />
           </div>
@@ -41,13 +47,9 @@ const MovieCard: Component<MovieCardProps> = (props) => {
         {/* Second Row: Screenings organized by cinema */}
         <div class="space-y-4">
           <For each={props.movie.screenings}>
-            {(cinemaGroup) => {
-              return (
-                <CinemaScreeningGroup
-                  group={cinemaGroup}
-                />
-              );
-            }}
+            {(cinemaGroup) => (
+              <CinemaScreeningGroup group={cinemaGroup} />
+            )}
           </For>
         </div>
       </div>
