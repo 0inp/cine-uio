@@ -37,6 +37,13 @@ func NewScraper(logger *logger.Logger, cfg *config.Config) (*Scraper, context.Ca
 func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle string, cinema database.Cinema, date time.Time, movieURL string) ([]models.ScrapedScreening, error) {
 	var screenings []models.ScrapedScreening
 
+	// Check for EmptyState (no screenings available)
+	emptyState := doc.Find(".MovieDetail__content__session-type .EmptyState")
+	if emptyState.Length() > 0 {
+		s.Logger.Info("  ℹ No screening times available for this day (EmptyState detected)")
+		return screenings, nil
+	}
+
 	// Find all session type containers
 	sessionContainers := doc.Find(".MovieDetail__content__session-type")
 	if sessionContainers.Length() == 0 {
@@ -144,8 +151,49 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 	}
 	s.Logger.Debug("  → Movie: %s", movieTitle)
 
-	// Scrape screenings for each day by clicking on day buttons (data-index 0-6)
-	for dayIndex := 0; dayIndex < 7; dayIndex++ {
+	// Check the data-index attribute of the active slick slide
+	var activeIndexStr string
+	err = chromedp.Run(s.Ctx,
+		chromedp.Evaluate(`document.querySelector('.slick-slide.slick-active')?.getAttribute('data-index') || '-1'`, &activeIndexStr),
+	)
+	if err != nil {
+		s.Logger.Warn("  ⚠ Error getting active slide index: %v", err)
+		activeIndexStr = "-1"
+	}
+
+	// Convert string to int
+	var activeIndex int
+	if activeIndexStr != "-1" {
+		_, err := fmt.Sscanf(activeIndexStr, "%d", &activeIndex)
+		if err != nil {
+			s.Logger.Warn("  ⚠ Error parsing active slide index '%s': %v", activeIndexStr, err)
+			activeIndex = -1
+		}
+	} else {
+		activeIndex = -1
+	}
+
+	s.Logger.Debug("  → Active slide data-index: %d", activeIndex)
+
+	// If active index > 6, skip this movie entirely
+	if activeIndex > 6 {
+		s.Logger.Info("  → Skipping movie: active index %d > 6", activeIndex)
+		return screenings, nil
+	}
+
+	// Determine the range of days to scrape: from activeIndex to 6
+	startIndex := activeIndex
+	endIndex := 6
+	if activeIndex < 0 {
+		// If we couldn't determine the active index, fall back to original behavior
+		startIndex = 0
+		endIndex = 6
+	}
+
+	s.Logger.Debug("  → Scraping days from index %d to %d", startIndex, endIndex)
+
+	// Scrape screenings for each day in the determined range
+	for dayIndex := startIndex; dayIndex <= endIndex; dayIndex++ {
 		s.Logger.Debug("  → Processing day %d", dayIndex)
 
 		if dayIndex > 0 {
@@ -181,6 +229,13 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(dayHTML))
 		if err != nil {
 			s.Logger.Warn("    ⚠ Error parsing HTML for day %d: %v", dayIndex, err)
+			continue
+		}
+
+		// Check for EmptyState before processing
+		emptyState := doc.Find(".MovieDetail__content__session-type .EmptyState")
+		if emptyState.Length() > 0 {
+			s.Logger.Info("    ℹ No screening times available for day %d (EmptyState detected)", dayIndex)
 			continue
 		}
 
