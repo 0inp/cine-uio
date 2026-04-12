@@ -11,10 +11,10 @@ export default createHandler(() => (
           <link rel="icon" href="/favicon.ico" />
           {assets}
         </head>
-         <body class="app-bg">
-           <div id="app" class="app-bg">{children}</div>
-           {scripts}
-         </body>
+        <body class="app-bg">
+          <div id="app" class="app-bg">{children}</div>
+          {scripts}
+        </body>
       </html>
     )}
   />

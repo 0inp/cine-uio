@@ -9,6 +9,16 @@ export function formatDate(date: Date): string {
   });
 }
 
+export function formatDateShort(date: Date): string {
+  return date.toLocaleDateString('es-ES', {
+    weekday: 'short'
+  });
+}
+
+export function formatDayNumber(date: Date): string {
+  return date.getDate().toString().padStart(2, '0');
+}
+
 export function isSameDay(date1: Date, date2: Date): boolean {
   return date1.toDateString() === date2.toDateString();
 }
