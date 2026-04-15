@@ -1,9 +1,0 @@
-[tools]
-bun = "latest"
-
-[tasks]
-dev = "bun run dev"
-build = "bun run build"
-preview = "bun run preview"
-format = "bun format"
-check = "bun check"

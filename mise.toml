@@ -1,9 +1,22 @@
 [tools]
 pre-commit = "latest"
 gitleaks = "latest"
+golangci-lint = "latest"
+go = "1.26.1"
+golangci-lint-langserver = "latest"
+bun = "latest"
 
 [tasks]
-install = """
-mise install && cd backend/ && mise install && cd ../frontend && mise
-install
-"""
+b-fmt = "cd backend && gofmt -s -w . && goimports -w ."
+b-lint = "cd backend && golangci-lint run"
+b-run-server = "cd backend && go run ./cmd/api"
+b-run-scraper = "cd backend && go run ./cmd/scraper"
+
+# Frontend tasks
+f-dev = "cd frontend && bun run dev"
+f-format = "cd frontend && bun format"
+f-check = "cd frontend && bun check"
+
+# Combined tasks
+all-lint = "mise run b-lint && mise run f-check"
+all-format = "mise run b-fmt && mise run f-format"
