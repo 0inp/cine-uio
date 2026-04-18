@@ -30,7 +30,8 @@ func NewTMDBService(cfg *config.Config) *TMDBService {
 		// Fallback to environment variable if not in config
 		apiKey = os.Getenv("TMDB_API_KEY")
 		if apiKey == "" {
-			log.Fatal("TMDB_API_KEY not set in config or environment")
+			log.Printf("ERROR: TMDB_API_KEY not set in config or environment")
+			return nil
 		}
 	}
 	return &TMDBService{

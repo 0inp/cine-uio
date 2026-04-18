@@ -28,7 +28,8 @@ func main() {
 	// Initialize database
 	db, err := database.InitDB(cfg.DatabasePath)
 	if err != nil {
-		log.Fatal("Failed to initialize database: %v", err)
+		log.Error("Failed to initialize database: %v", err)
+		return
 	}
 	defer func() {
 		if err := database.CloseDB(); err != nil {
@@ -39,7 +40,8 @@ func main() {
 	// Run migrations
 	err = migrations.RunAllMigrations(db)
 	if err != nil {
-		log.Fatal("Failed to run database migrations: %v", err)
+		log.Error("Failed to run database migrations: %v", err)
+		return
 	}
 
 	// Clear old screening data before new scrape
@@ -56,7 +58,8 @@ func main() {
 	// Run the full scraper for all cinemas and all movies
 	screenings, err := scraperInstance.ScrapeMulticines()
 	if err != nil {
-		log.Fatal("Scraping failed: %v", err)
+		log.Error("Scraping failed: %v", err)
+		return
 	}
 
 	// Remove duplicate screenings

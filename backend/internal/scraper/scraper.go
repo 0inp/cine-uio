@@ -40,7 +40,7 @@ func (s *Scraper) scrapeScreeningTimesFromHTML(doc *goquery.Document, movieTitle
 	// Check for EmptyState (no screenings available)
 	emptyState := doc.Find(".MovieDetail__content__session-type .EmptyState")
 	if emptyState.Length() > 0 {
-		s.Logger.Info("  ℹ No screening times available for this day (EmptyState detected)")
+		s.Logger.Info("  i No screening times available for this day (EmptyState detected)")
 		return screenings, nil
 	}
 
@@ -165,7 +165,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 	if err != nil {
 		s.Logger.Warn("  ⚠ Error checking movie EmptyState: %v", err)
 	} else if movieHasEmptyState {
-		s.Logger.Info("  ℹ Skipping movie: EmptyState detected (no screenings available)")
+		s.Logger.Info("  i Skipping movie: EmptyState detected (no screenings available)")
 		return screenings, nil
 	}
 
@@ -194,29 +194,76 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 	s.Logger.Debug("  → Active slide data-index: %d", activeIndex)
 
 	// If active index > 6, skip this movie entirely
+	// This maintains the original behavior of only scraping 7-day windows
 	if activeIndex > 6 {
-		s.Logger.Info("  → Skipping movie: active index %d > 6", activeIndex)
+		s.Logger.Info("  → Skipping movie: active index %d > 6 (outside 7-day window)", activeIndex)
 		return screenings, nil
 	}
 
-	// Determine the range of days to scrape: from activeIndex to 6
-	startIndex := activeIndex
-	endIndex := 6
-	if activeIndex < 0 {
-		// If we couldn't determine the active index, fall back to original behavior
-		startIndex = 0
-		endIndex = 6
+	// Improved approach: Extract all available dates and their screenings
+	// Try multiple strategies to get date information
+	var dateElements []map[string]interface{}
+
+	// Strategy 1: Try to extract from slick slider
+	err1 := chromedp.Run(s.Ctx,
+		chromedp.Evaluate(`
+			Array.from(document.querySelectorAll('.MovieDetail__content__days [data-index], .slick-slide[data-index]')).map(el => ({
+				index: el.getAttribute('data-index'),
+				text: el.textContent?.trim(),
+				date: el.getAttribute('data-date') || el.getAttribute('data-day')
+			}))
+		`, &dateElements),
+	)
+
+	if err1 != nil || len(dateElements) == 0 {
+		// Strategy 2: Try alternative selectors
+		_ = chromedp.Run(s.Ctx,
+			chromedp.Evaluate(`
+				Array.from(document.querySelectorAll('[data-index], [data-day-index], [class*="day"]')).map(el => ({
+					index: el.getAttribute('data-index') || el.getAttribute('data-day-index'),
+					text: el.textContent?.trim(),
+					date: el.getAttribute('data-date') || el.getAttribute('data-day')
+				}))
+			`, &dateElements),
+		)
+		// If both strategies fail, dateElements will remain empty and we'll fall back to navigation
 	}
 
-	s.Logger.Debug("  → Scraping days from index %d to %d", startIndex, endIndex)
+	var datesToScrape []struct {
+		index int
+		date  string
+	}
 
-	// Scrape screenings for each day in the determined range
-	for dayIndex := startIndex; dayIndex <= endIndex; dayIndex++ {
+	// Revert to original behavior: only scrape days 0-6 (today to today+6 days)
+	// This maintains the intended 7-day window
+	startIndex := 0
+	endIndex := 6
+
+	// If we have a valid activeIndex within our target range, use it as starting point
+	if activeIndex >= 0 && activeIndex <= 6 {
+		startIndex = activeIndex
+	}
+
+	s.Logger.Debug("  → Scraping days from index %d to %d (7-day window)", startIndex, endIndex)
+
+	for i := startIndex; i <= endIndex; i++ {
+		datesToScrape = append(datesToScrape, struct {
+			index int
+			date  string
+		}{
+			index: i,
+			date:  "",
+		})
+	}
+
+	// Scrape screenings for each date
+	for _, dateInfo := range datesToScrape {
+		dayIndex := dateInfo.index
 		s.Logger.Debug("  → Processing day %d", dayIndex)
 
 		if dayIndex > 0 {
-			// Click on the day button for days 1-6 with retry logic
-			s.Logger.Debug("  → Clicking on day %d (data-index=%d)", dayIndex, dayIndex)
+			// Try to navigate to the specific day
+			s.Logger.Debug("  → Navigating to day %d", dayIndex)
 
 			maxRetries := 2
 			success := false
@@ -225,54 +272,69 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 					s.Logger.Debug("    → Retry %d/%d for day %d", retry, maxRetries, dayIndex)
 				}
 
-				err = chromedp.Run(s.Ctx,
-					chromedp.Click(fmt.Sprintf(`.slick-slide[data-index="%d"]`, dayIndex), chromedp.ByQuery),
-					// Improved waiting strategy for day transitions
-					chromedp.WaitVisible(`.MovieDetail__content__session-type`, chromedp.ByQuery),
-					// Wait for specific content to ensure full load
-					chromedp.WaitNotPresent(`div[class*="loading"][style*="display: block"]`, chromedp.ByQuery),
-					// Additional check for session content
-					chromedp.WaitVisible(`.SessionType, .sc-10d01b1b-0`, chromedp.ByQuery),
-					chromedp.Sleep(800*time.Millisecond), // Slightly longer fallback for reliability
+				// Try multiple navigation strategies
+				navigationErr := chromedp.Run(s.Ctx,
+					// Strategy 1: Try clicking with JavaScript (more reliable)
+					chromedp.Evaluate(fmt.Sprintf(`
+						var dayElement = document.querySelector('.MovieDetail__content__days [data-index="%d"], .slick-slide[data-index="%d"]');
+						if (dayElement) {
+							dayElement.scrollIntoView({behavior: 'smooth', block: 'center'});
+							setTimeout(() => dayElement.click(), 100);
+						}
+					`, dayIndex, dayIndex), nil),
+					// Wait for navigation to complete
+					chromedp.WaitVisible("body", chromedp.ByQuery),
+					chromedp.Sleep(500*time.Millisecond),
 				)
 
-				if err != nil {
+				if navigationErr != nil {
+					s.Logger.Debug("    → JavaScript click failed, trying direct click: %v", navigationErr)
+					// Strategy 2: Try direct chromedp click
+					navigationErr = chromedp.Run(s.Ctx,
+						chromedp.Click(fmt.Sprintf(`.MovieDetail__content__days [data-index="%d"], .slick-slide[data-index="%d"]`, dayIndex, dayIndex), chromedp.ByQuery),
+						chromedp.Sleep(300*time.Millisecond),
+					)
+				}
+
+				if navigationErr != nil {
 					if retry < maxRetries {
 						continue // Try again
 					}
-					s.Logger.Warn("    ⚠ Error clicking day %d after %d retries: %v", dayIndex, maxRetries, err)
+					s.Logger.Warn("    ⚠ Error navigating to day %d after %d retries: %v", dayIndex, maxRetries, navigationErr)
 					break
 				}
 
-				// Verify the active day changed correctly
-				var activeDayIndex int
+				// Verify we have content for this day
+				var hasContent bool
 				err = chromedp.Run(s.Ctx,
-					chromedp.Evaluate(`parseInt(document.querySelector('.slick-slide.slick-active')?.getAttribute('data-index') || '-1')`, &activeDayIndex),
+					chromedp.Evaluate(`!!document.querySelector('.SessionType, .sc-10d01b1b-0, .ScheduleSession, .sc-870fb5d6-0, .MovieDetail__content__session-type')`, &hasContent),
 				)
 				if err != nil {
 					if retry < maxRetries {
-						continue // Try again
+						continue
 					}
-					s.Logger.Warn("    ⚠ Could not verify active day after clicking day %d: %v", dayIndex, err)
+					s.Logger.Warn("    ⚠ Could not verify content for day %d: %v", dayIndex, err)
 					break
 				}
 
-				if activeDayIndex == dayIndex {
-					s.Logger.Debug("    ✅ Successfully navigated to day %d", dayIndex)
+				if hasContent {
+					s.Logger.Debug("    ✅ Successfully loaded content for day %d", dayIndex)
 					success = true
 					break
 				}
-				s.Logger.Warn("    ⚠ Active day mismatch on attempt %d: expected %d, got %d", retry+1, dayIndex, activeDayIndex)
+
 				if retry < maxRetries {
-					// Try to click again
+					// Content not loaded yet, try again
 					continue
 				}
-				s.Logger.Warn("    ⚠ Failed to navigate to day %d after %d attempts", dayIndex, maxRetries)
+
+				s.Logger.Warn("    ⚠ No content found for day %d after loading", dayIndex)
 				break
 			}
 
 			if !success {
-				continue // Skip this day if we couldn't navigate to it
+				s.Logger.Info("    i Skipping day %d (could not load content)", dayIndex)
+				continue
 			}
 		}
 
@@ -292,7 +354,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 			continue
 		}
 		if hasEmptyState {
-			s.Logger.Info("    ℹ No screening times available for day %d (EmptyState detected)", dayIndex)
+			s.Logger.Info("    i No screening times available for day %d (EmptyState detected)", dayIndex)
 			continue
 		}
 
@@ -325,7 +387,7 @@ func (s *Scraper) ScrapeMovieScreenings(movieURL string, cinema database.Cinema)
 		// Check for EmptyState before processing
 		emptyState := doc.Find(".MovieDetail__content__session-type .EmptyState")
 		if emptyState.Length() > 0 {
-			s.Logger.Info("    ℹ No screening times available for day %d (EmptyState detected)", dayIndex)
+			s.Logger.Info("    i No screening times available for day %d (EmptyState detected)", dayIndex)
 			continue
 		}
 
