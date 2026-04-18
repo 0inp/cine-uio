@@ -1,8 +1,8 @@
 import { For } from "solid-js";
-import DaysSlider from "../components/DaysSlider";
-import MovieCard from "../components/MovieCard";
-import { useMovies } from "../hooks/useMovies";
-import { Skeleton } from "../components/Skeleton";
+import DaysSlider from "~/components/DaysSlider";
+import MovieCard from "~/components/MovieCard";
+import { useMovies } from "~/hooks/useMovies";
+import { Skeleton } from "~/components/Skeleton";
 
 export default function MoviesPage() {
   const { filteredMovies, dates, selectedDate, setSelectedDate, error, isLoading } = useMovies();

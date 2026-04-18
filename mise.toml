@@ -15,7 +15,7 @@ b-run-scraper = "cd backend && go run ./cmd/scraper"
 # Frontend tasks
 f-dev = "cd frontend && bun run dev"
 f-format = "cd frontend && bun format"
-f-check = "cd frontend && bun check"
+f-check = "cd frontend && bun check && bun type-check"
 
 # Combined tasks
 all-lint = "mise run b-lint && mise run f-check"

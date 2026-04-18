@@ -20,9 +20,16 @@ repos:
         pass_filenames: true
   - repo: local
     hooks:
+      - id: biome-format
+        name: Biome Format (Frontend) - Auto-fix
+        entry: bash -c 'cd frontend && bun run format'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        always_run: true
       - id: biome-check
         name: Biome Check (Frontend)
-        entry: bash -c 'cd frontend && bun run biome check'
+        entry: bash -c 'cd frontend && bun run check'
         language: system
         pass_filenames: false
         stages: [pre-commit]

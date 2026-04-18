@@ -1,16 +1,20 @@
 // Custom hook for managing movie data
 import { createResource, createSignal, createEffect } from "solid-js";
-import { Movie, MovieWithScreenings } from "../types/movie";
-import { getDateRange } from "../utils/date";
+import { Movie, MovieWithScreenings } from "~/types/movie";
+import { getDateRange } from "~/utils/date";
 
 export function useMovies() {
   // Fetch movies from API
   const [movies] = createResource<Movie[]>(async () => {
     try {
       const response = await fetch("http://localhost:8080/api/movies");
-      if (!response.ok) throw new Error("Failed to fetch movies");
+      if (!response.ok) {
+        setError("Failed to fetch movies")
+        throw new Error("Failed to fetch movies");
+      }
       return await response.json();
     } catch (error) {
+      setError("Error fetching movies")
       console.error("Error fetching movies:", error);
       return [];
     }

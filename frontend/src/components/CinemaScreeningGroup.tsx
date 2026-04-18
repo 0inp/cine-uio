@@ -1,5 +1,5 @@
 import { Component, For, createSignal, onMount, onCleanup } from "solid-js";
-import { CinemaScreening } from "../types/movie";
+import { CinemaScreening } from "~/types/movie";
 
 interface CinemaScreeningGroupProps {
   group: CinemaScreening;

@@ -1,6 +1,6 @@
 import { Component, For } from "solid-js";
-import { MovieWithScreenings } from "../types/movie";
-import { getBackdropUrl, getPosterUrl } from "../utils/tmdb";
+import { MovieWithScreenings } from "~/types/movie";
+import { getBackdropUrl, getPosterUrl } from "~/utils/tmdb";
 import CinemaScreeningGroup from "./CinemaScreeningGroup";
 import MovieDetails from "./MovieDetails";
 

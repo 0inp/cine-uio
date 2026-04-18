@@ -1,5 +1,5 @@
 import { Component, For } from "solid-js";
-import { OrganizedScreening } from "../types/movie";
+import { OrganizedScreening } from "~/types/movie";
 
 interface ScreeningGroupProps {
   group: OrganizedScreening;

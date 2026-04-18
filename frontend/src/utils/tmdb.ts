@@ -1,6 +1,6 @@
 // Utility functions for working with TMDB data
 import { createResource } from "solid-js";
-import { TMDBConfig } from "../types/movie";
+import { TMDBConfig } from "~/types/movie";
 
 // Create a resource to fetch TMDB config from our backend
 const [tmdbConfigResource] = createResource(async () => {

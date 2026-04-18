@@ -1,5 +1,5 @@
 import { Component } from "solid-js";
-import { MovieWithScreenings } from "../types/movie";
+import { MovieWithScreenings } from "~/types/movie";
 import { ClockIcon, StarIcon } from "./icons";
 
 interface MovieDetailsProps {

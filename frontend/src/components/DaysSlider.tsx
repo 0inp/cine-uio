@@ -1,5 +1,5 @@
 import { For } from "solid-js";
-import { formatDate, formatDateShort, formatDayNumber, isSameDay } from "../utils/date";
+import { formatDateShort, formatDayNumber, isSameDay } from "~/utils/date";
 
 interface DaySliderProps {
   dates: Date[];
