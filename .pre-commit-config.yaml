@@ -16,8 +16,6 @@ repos:
         args: [--config=backend/.golangci.yml]
         entry: bash -c 'cd backend && golangci-lint run --config=.golangci.yml --fix=false'
         stages: [pre-commit]
-        files: \.go$
-        types: [go]
         language: golang
         pass_filenames: true
   - repo: local
