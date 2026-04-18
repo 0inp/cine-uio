@@ -3,14 +3,23 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
       - id: check-yaml
+        stages: [pre-commit]
   - repo: https://github.com/golangci/golangci-lint
     rev: v2.11.4
     hooks:
       - id: golangci-lint
+        name: golangci-lint
         args: [--config=backend/.golangci.yml]
-        entry: bash -c 'cd backend && golangci-lint run --config=.golangci.yml'
+        entry: bash -c 'cd backend && golangci-lint run --config=.golangci.yml --fix=false'
+        stages: [pre-commit]
+        files: \.go$
+        types: [go]
+        language: golang
+        pass_filenames: true
   - repo: local
     hooks:
       - id: biome-check
@@ -18,8 +27,10 @@ repos:
         entry: bash -c 'cd frontend && bun run biome check'
         language: system
         pass_filenames: false
+        stages: [pre-commit]
       - id: typescript-check
         name: TypeScript Check (Frontend)
         entry: bash -c 'cd frontend && bun run tsc --noEmit'
         language: system
         pass_filenames: false
+        stages: [pre-commit]

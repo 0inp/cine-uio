@@ -3,6 +3,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"scraper/internal/api/routes"
 	"scraper/internal/scraper"
 	"scraper/internal/shared/config"
+	"scraper/internal/shared/database"
 )
 
 // Server represents the API server
@@ -20,12 +22,18 @@ type Server struct {
 }
 
 // NewServer creates a new API server instance
-func NewServer(addr string, cfg *config.Config) *Server {
+func NewServer(addr string, cfg *config.Config) (*Server, error) {
+	// Initialize database connection
+	_, err := database.InitDB(cfg.DatabasePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
 	return &Server{
 		Addr:        addr,
 		Config:      cfg,
 		TMDBService: scraper.NewTMDBService(cfg),
-	}
+	}, nil
 }
 
 // Start starts the API server with proper timeout configuration

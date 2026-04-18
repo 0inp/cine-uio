@@ -48,6 +48,7 @@ type Screening struct {
 	Time     string    `gorm:"not null"`
 	Language string    `gorm:"not null"`
 	URL      string    `gorm:"type:text;default:null"` // Actual URL to the cinema website for this screening
+	Cinema   Cinema    `gorm:"foreignKey:CinemaID"`    // Preloaded cinema association
 }
 
 // TableName overrides for explicit table naming

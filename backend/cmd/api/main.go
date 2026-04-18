@@ -13,7 +13,10 @@ func main() {
 	cfg := config.LoadConfig()
 
 	// Create and start API server
-	server := api.NewServer(cfg.APIAddress, cfg)
+	server, err := api.NewServer(cfg.APIAddress, cfg)
+	if err != nil {
+		log.Fatalf("Failed to create server: %v", err)
+	}
 	if err := server.Start(); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
