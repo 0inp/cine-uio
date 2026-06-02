@@ -47,4 +47,3 @@ class Screening(Base):
 
     complex = relationship("CinemaComplex", back_populates="screenings")
     movie = relationship("Movie", back_populates="screenings")
-
