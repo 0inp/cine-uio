@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: cine-uio
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.14
+Description-Content-Type: text/markdown
+Requires-Dist: alembic>=1.18.4
+Requires-Dist: fastapi>=0.136.3
+Requires-Dist: playwright>=1.60.0
+Requires-Dist: pytest>=9.0.3
+Requires-Dist: python-dotenv>=1.2.2
+Requires-Dist: sqlalchemy>=2.0.50
+Requires-Dist: uvicorn>=0.48.0

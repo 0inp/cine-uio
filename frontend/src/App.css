@@ -1,0 +1,124 @@
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.title {
+  text-align: center;
+  color: var(--accent);
+  margin-bottom: 30px;
+}
+
+.loading,
+.error,
+.no-data {
+  text-align: center;
+  font-size: 18px;
+  margin-top: 50px;
+}
+
+.error {
+  color: #ff4444;
+}
+
+.cinema-complex {
+  margin-bottom: 40px;
+  background: var(--social-bg);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.complex-name {
+  color: var(--text-h);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 20px;
+}
+
+.movies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.movie-card {
+  background: #1a1a1a; /* Dark background */
+  border: 1px solid #333; /* Light border */
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  width: 95%; /* Take almost the whole width */
+  color: #f0f0f0; /* Light text */
+}
+
+.complex-section {
+  margin: 12px 0;
+}
+
+.screenings-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.screening-item {
+  background: #333; /* Darker background */
+  border: 1px solid #444; /* Light border */
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  display: flex;
+  gap: 8px; /* Horizontal layout */
+  align-items: center; /* Center items vertically */
+  color: #f0f0f0; /* Light text */
+}
+
+.complex-name {
+  font-size: 1.1rem;
+  margin: 8px 0;
+  color: #f0f0f0; /* Light text */
+  font-weight: 600;
+}
+
+.movie-title {
+  font-size: 1.5rem;
+  margin: 0 0 12px 0;
+  color: #fff; /* White text */
+}
+
+.movie-title {
+  color: var(--accent);
+  margin-top: 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.screenings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.screening-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px;
+}
+
+.screening-time {
+  font-weight: bold;
+}
+
+.screening-format,
+.screening-language {
+  font-size: 14px;
+  color: #666;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f0f0f0;
+}

@@ -1,0 +1,14 @@
+pyproject.toml
+app/__init__.py
+app/database.py
+app/entities.py
+app/main.py
+app/models.py
+app/run_dummy_scraper.py
+app/scraper.py
+app/seed.py
+cine_uio.egg-info/PKG-INFO
+cine_uio.egg-info/SOURCES.txt
+cine_uio.egg-info/dependency_links.txt
+cine_uio.egg-info/requires.txt
+cine_uio.egg-info/top_level.txt
