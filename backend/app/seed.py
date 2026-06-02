@@ -1,7 +1,6 @@
-from sqlalchemy.orm import Session
-
 from database import SessionLocal
 from models import CinemaCompany, CinemaComplex
+from sqlalchemy.orm import Session
 
 
 def seed_database():
@@ -51,4 +50,3 @@ def seed_database():
 
 if __name__ == "__main__":
     seed_database()
-
