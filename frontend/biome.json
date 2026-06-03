@@ -10,33 +10,17 @@
 	},
 	"formatter": {
 		"enabled": true,
-		"indentStyle": "tab",
-		"attributePosition": "multiline"
+		"indentStyle": "tab"
 	},
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
-			"correctness": {
-				"noUnusedVariables": "off",
-				"noUnusedImports": "error"
-			},
-			"style": {
-				"useBlockStatements": "off",
-				"useConsistentArrayType": "off"
-			},
-			"a11y": {
-				"useValidAnchor": "error",
-				"useValidAriaProps": "error",
-				"useValidAriaRole": "error",
-				"useAriaPropsForRole": "error"
-			}
+			"recommended": true
 		}
 	},
 	"javascript": {
 		"formatter": {
-			"quoteStyle": "double",
-			"semicolons": "asNeeded"
+			"quoteStyle": "double"
 		}
 	},
 	"assist": {

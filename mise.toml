@@ -1,0 +1,59 @@
+[tools]
+python = "latest"
+node = "latest"
+
+[tasks.backend_lint]
+description = "Lint backend"
+run = [
+  "uv run mypy .",
+  "uv run ruff check .",
+]
+dir = "{{cwd}}/backend"
+
+[tasks.frontend_lint]
+description = "Lint frontend"
+run = [
+  "bun run lint",
+  "bun run typecheck",
+]
+dir = "{{cwd}}/frontend"
+
+[tasks.lint]
+description = "Lint application"
+depends = ["backend_lint", "frontend_lint"]
+
+[tasks.backend_format]
+description = "format backend"
+run = [
+  "uv run ruff format .",
+]
+dir = "{{cwd}}/backend"
+
+[tasks.frontend_format]
+description = "format frontend"
+run = [
+  "bun run format",
+]
+dir = "{{cwd}}/frontend"
+
+[tasks.format]
+description = "format application"
+depends = ["backend_format", "frontend_format"]
+
+[tasks.backend_test]
+description = "test backend"
+run = [
+  "uv run pytest",
+]
+dir = "{{cwd}}/backend"
+
+[tasks.frontend_test]
+description = "test frontend"
+run = [
+  "bun run test",
+]
+dir = "{{cwd}}/frontend"
+
+[tasks.test]
+description = "test application"
+depends = ["backend_test", "frontend_test"]
