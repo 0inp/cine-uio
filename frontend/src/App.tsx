@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import apiConfig from "./config";
 
 interface CinemaCompany {
 	name: string;
@@ -32,7 +33,7 @@ function App() {
 	useEffect(() => {
 		const fetchScreenings = async () => {
 			try {
-        const response = await fetch("http://localhost:8000/api/screenings");
+				const response = await fetch(`${apiConfig.url}/screenings`);
 				if (!response.ok) {
 					throw new Error(`HTTP error! status: ${response.status}`);
 				}
