@@ -1,1 +1,3 @@
 backend/cine_uio.db
+# build artifacts
+*.tsbuildinfo
