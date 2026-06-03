@@ -35,24 +35,24 @@ class Scraper(ABC):
     company_name: ClassVar[str]
     _registry: ClassVar[dict[str, Type["Scraper"]]] = {}
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls: Type[Scraper], **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)
         if hasattr(cls, "company_name"):
             cls._registry[cls.company_name] = cls
 
     @classmethod
-    def create(cls, company: CinemaCompany) -> "Scraper":
+    def create(cls, company: CinemaCompany) -> Scraper:
         scraper_cls = cls._registry.get(company.name)
         if scraper_cls is None:
             raise ValueError(f"No scraper registered for company: {company.name}")
         return scraper_cls(company)
 
-    def __init__(self, company: CinemaCompany):
+    def __init__(self, company: CinemaCompany) -> None:
         self.company: CinemaCompany = company
         self.db: Session = SessionLocal()
 
     @abstractmethod
-    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex):
+    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
         pass
 
     async def run_scrape(self) -> None:

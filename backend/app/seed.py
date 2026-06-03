@@ -1,9 +1,9 @@
-from database import SessionLocal
-from models import CinemaCompany, CinemaComplex
+from app.database import SessionLocal
+from app.models import CinemaCompany, CinemaComplex
 from sqlalchemy.orm import Session
 
 
-def seed_database():
+def seed_database() -> None:
     db: Session = SessionLocal()
 
     # Seed CinemaCompany

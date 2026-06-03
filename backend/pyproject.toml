@@ -5,15 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "alembic>=1.18.4",
-    "fastapi>=0.136.3",
-    "fastapi-cors>=0.0.6",
-    "playwright>=1.60.0",
-    "pytest>=9.0.3",
-    "python-dotenv>=1.2.2",
-    "requests>=2.34.2",
-    "sqlalchemy>=2.0.50",
-    "uvicorn>=0.48.0",
+  "alembic>=1.18.4",
+  "fastapi>=0.136.3",
+  "fastapi-cors>=0.0.6",
+  "playwright>=1.60.0",
+  "pytest>=9.0.3",
+  "python-dotenv>=1.2.2",
+  "requests>=2.34.2",
+  "sqlalchemy>=2.0.50",
+  "uvicorn>=0.48.0",
 ]
 
 [dependency-groups]
