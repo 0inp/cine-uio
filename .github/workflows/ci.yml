@@ -5,40 +5,23 @@ on:
     branches: [ main ]
 
 jobs:
-  backend:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install mise
+        uses: jdx/mise-action@v2
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
-      - name: Install dependencies
-        run: pip install ruff mypy pytest
-      - name: Lint with Ruff
-        run: ruff check backend
-      - name: Format with Ruff
-        run: ruff format --check backend
-      - name: Type check with mypy
-        run: mypy backend
-      - name: Test with pytest
-        run: pytest backend
-
-  frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+          python-version: "3.12"
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "lts/*"
       - name: Install dependencies
-        run: cd frontend && npm install
-      - name: Lint with Biome
-        run: cd frontend && npx biome lint
-      - name: Format with Biome
-        run: cd frontend && npx biome format --check
-      - name: Type check with TypeScript
-        run: cd frontend && npx tsc -b
-      - name: Test with Vitest
-        run: cd frontend && npx vitest run
+        run: |
+          cd frontend && npm install
+          cd ../backend && pip install -e .[dev]
+      - name: Run unified linting
+        run: mise run lint

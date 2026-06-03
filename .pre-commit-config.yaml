@@ -1,18 +1,34 @@
 repos:
   - repo: local
     hooks:
-      # Backend: Linting
+      # Backend: Linting + Typecheck
       - id: backend-lint
         name: backend-lint
         entry: mise run backend_lint
         language: system
         pass_filenames: false
         files: ^backend/
+        
+      # Backend: Formatting
+      - id: backend-format
+        name: backend-format
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+        files: ^backend/
 
-      # Frontend: Linting
+      # Frontend: Linting + Typecheck
       - id: frontend-lint
         name: frontend-lint
         entry: mise run frontend_lint
+        language: system
+        pass_filenames: false
+        files: ^frontend/
+        
+      # Frontend: Formatting
+      - id: frontend-format
+        name: frontend-format
+        entry: bun run format --check
         language: system
         pass_filenames: false
         files: ^frontend/
