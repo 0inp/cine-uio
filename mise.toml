@@ -15,6 +15,7 @@ description = "Lint frontend"
 run = [
   "bun run lint",
   "bun run typecheck",
+  "bun run format",
 ]
 dir = "{{cwd}}/frontend"
 

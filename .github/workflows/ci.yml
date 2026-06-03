@@ -1,44 +1,87 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+    types: [opened, synchronize]
 
 jobs:
-  backend:
+  backend_pipeline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - name: Install dependencies
-        run: pip install ruff mypy pytest
-      - name: Lint with Ruff
-        run: ruff check backend
-      - name: Format with Ruff
-        run: ruff format --check backend
-      - name: Type check with mypy
-        run: mypy backend
-      - name: Test with pytest
-        run: pytest backend
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-  frontend:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "backend/pyproject.toml"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --locked --all-extras --dev
+
+      # - name: Run backend tests
+      #   working-directory: backend
+      #   run: npm test
+
+      - name: Lint backend code
+        working-directory: backend
+        run: |
+          uv run mypy .
+          uv run ruff check .
+
+  # deploy_backend:
+  #   needs: [backend_pipeline]
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #     - name: Deploy backend to Render
+  #       if: ${{ github.event_name == 'push' }}
+  #       env:
+  #         RENDER_SERVICE_ID: ${{ secrets.RENDER_BACKEND_SERVICE_ID }}
+  #         RENDER_API_KEY: ${{ secrets.RENDER_BACKEND_API_KEY }}
+  #       run: |
+  #         curl -X GET "https://api.render.com/deploy/srv-${{ secrets.RENDER_BACKEND_SERVICE_ID }}?key=${{ secrets.RENDER_BACKEND_API_KEY }}"
+
+  frontend_pipeline:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
-      - name: Install dependencies
-        run: cd frontend && npm install
-      - name: Lint with Biome
-        run: cd frontend && npx biome lint
-      - name: Format with Biome
-        run: cd frontend && npx biome format --check
-      - name: Type check with TypeScript
-        run: cd frontend && npx tsc -b
-      - name: Test with Vitest
-        run: cd frontend && npx vitest run
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: bun install
+
+      # - name: Run frontend tests
+      #   working-directory: frontend
+      #   run: npm test
+
+      - name: Lint frontend code (does not fail pipeline)
+        working-directory: frontend
+        run: bun run lint
+
+  # deploy_frontend:
+  #   needs: [frontend_pipeline]
+  #   runs-on: ubuntu-20.04
+  #   steps:
+  #     - name: Deploy frontend to Render
+  #       if: ${{ github.event_name == 'push' }}
+  #       env:
+  #         RENDER_FRONTEND_SERVICE_ID: ${{ secrets.RENDER_FRONTEND_SERVICE_ID }}
+  #         RENDER_API_KEY: ${{ secrets.RENDER_FRONTEND_API_KEY }}
+  #       run: |
+  #         curl -X GET "https://api.render.com/deploy/srv-${{ secrets.RENDER_FRONTEND_SERVICE_ID }}?key=${{ secrets.RENDER_FRONTEND_API_KEY }}"

@@ -1,31 +1,29 @@
 repos:
   - repo: local
     hooks:
-      # Backend: Linting
-      - id: backend-lint
-        name: backend-lint
-        entry: mise run backend_lint
+      # Backend: Linting + Typecheck
+      - id: lint
+        name: lint
+        entry: mise lint
         language: system
         pass_filenames: false
-        files: ^backend/
+        # files: ^backend/
 
-      # Frontend: Linting
-      - id: frontend-lint
-        name: frontend-lint
-        entry: mise run frontend_lint
+      # Backend: Formatting
+      - id: format
+        name: format
+        entry: mise format
         language: system
         pass_filenames: false
-        files: ^frontend/
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^frontend/tsconfig\.tsbuildinfo$
       - id: end-of-file-fixer
+        exclude: ^frontend/tsconfig\.tsbuildinfo$
       - id: check-yaml
       - id: check-added-large-files
       - id: check-merge-conflict
-      - id: check-symlinks
       - id: mixed-line-ending
-      - id: fix-encoding-pragma
-        language_version: python3
