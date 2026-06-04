@@ -26,6 +26,7 @@ depends = ["backend_lint", "frontend_lint"]
 [tasks.backend_format]
 description = "format backend"
 run = [
+  "uv run ruff check . --fix",
   "uv run ruff format .",
 ]
 dir = "{{cwd}}/backend"
