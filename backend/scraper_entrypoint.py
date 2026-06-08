@@ -3,15 +3,12 @@ Script to run the scrapers for cinema data.
 """
 
 import asyncio
-import logging
 import sys
 
 from app.database import SessionLocal, get_all_cinema_companies
+from app.logging import logger
 from app.scraper import Scraper
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
