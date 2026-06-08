@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.database import (
     SessionLocal,
-    delete_all_screenings,
     get_all_cinema_complexes_from_cinema_company,
 )
 from app.entities import CinemaCompany, CinemaComplex
@@ -42,7 +41,6 @@ class Scraper(ABC):
 
     def run_scrape(self) -> None:
         logger.info("Deleting all screenings to start from scratch")
-        delete_all_screenings(self.db)
         logger.info(f"Starting to scrape company: {self.company.name}")
 
         with sync_playwright() as p:

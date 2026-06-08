@@ -3,16 +3,16 @@ import { defineConfig, mergeConfig } from "vite";
 import { defineConfig as defineVitestConfig } from "vitest/config";
 
 const viteConfig = defineConfig({
-	plugins: [react()],
+  plugins: [react()],
 });
 
 const vitestConfig = defineVitestConfig({
-	test: {
-		globals: true,
-		environment: "jsdom",
-		setupFiles: "./src/setupTests.ts",
-		css: true,
-	},
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: "./src/setupTests.ts",
+    css: true,
+  },
 });
 
 export default mergeConfig(viteConfig, vitestConfig);

@@ -103,7 +103,6 @@ class MulticinesScraper(Scraper):
                             screening_sessions: list[ScreeningSessionDict] = screening_theater_type["sessions"]
                             for screening_session in screening_sessions:
                                 screening_datetime = screening_session["showtime"]
-                                logger.info(f"screening_datetime : {screening_datetime}")
                                 screening = Screening(
                                     datetime=datetime.fromisoformat(screening_datetime),
                                     format=screening_format,
@@ -115,9 +114,9 @@ class MulticinesScraper(Scraper):
                 else:
                     logger.error(f"Error {screenings_response.status_code}: {screenings_response.text}")
 
-                logger.info(f"Movie {movie.title} has {len(movie_screenings)} screenings")
+            logger.info(f"Movie {movie.title} has {len(movie_screenings)} screenings")
 
-                screenings.extend(movie_screenings)
+            screenings.extend(movie_screenings)
 
         try:
             save_screenings(self.db, screenings)

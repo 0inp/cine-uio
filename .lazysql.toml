@@ -1,0 +1,4 @@
+[[database]]
+Name = "Local development"
+Provider = "sqlite3"
+URL = "file:backend/cine_uio.db"
