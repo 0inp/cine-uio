@@ -1,100 +1,32 @@
-# """
-# Playwright scrapers for cinema data.
-#
-# This module contains:
-# - Scraper: Abstract base class factory for scrapers.
-# - MulticinesScraper: Scraper for Multicines website.
 # - SupercinesScraper: Scraper for Supercines website.
-# """
 import json
-import logging
 import re
 import sys
-from abc import ABC, abstractmethod
 from datetime import date, datetime, timedelta
-from typing import ClassVar, Type
 
 import requests
-from playwright.async_api import Browser, ElementHandle, Page, async_playwright
-from sqlalchemy.orm import Session
+from playwright.sync_api import Page, ElementHandle
 
-from app.database import (
-    SessionLocal,
-    delete_all_screenings,
-    get_all_cinema_complexes_from_cinema_company,
-    save_screenings,
-)
-from app.entities import CinemaCompany, CinemaComplex, Movie, Screening
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-class Scraper(ABC):
-    company_name: ClassVar[str]
-    _registry: ClassVar[dict[str, Type["Scraper"]]] = {}
-
-    def __init_subclass__(cls: Type[Scraper], **kwargs: object) -> None:
-        super().__init_subclass__(**kwargs)
-        if hasattr(cls, "company_name"):
-            cls._registry[cls.company_name] = cls
-
-    @classmethod
-    def create(cls, company: CinemaCompany) -> Scraper:
-        scraper_cls = cls._registry.get(company.name)
-        if scraper_cls is None:
-            raise ValueError(f"No scraper registered for company: {company.name}")
-        return scraper_cls(company)
-
-    def __init__(self, company: CinemaCompany) -> None:
-        self.company: CinemaCompany = company
-        self.db: Session = SessionLocal()
-
-    @abstractmethod
-    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
-        pass
-
-    async def run_scrape(self) -> None:
-        logger.info("Deleting all screenings to start from scratch")
-        delete_all_screenings(self.db)
-        logger.info(f"Starting to scrape company: {self.company.name}")
-
-        async with async_playwright() as p:
-            browser: Browser = await p.chromium.launch(headless=False)
-            complexes: list[CinemaComplex] = (
-                get_all_cinema_complexes_from_cinema_company(self.db, self.company.name)
-            )
-            for complex in complexes:
-                url = f"{self.company.base_url}{complex.url_part}"
-                logger.info(f"Scraping complex: {url}")
-                page: Page = await browser.new_page()
-                try:
-                    await page.goto(url, wait_until="networkidle")
-                    await self._scrape_complex_page(page, complex)
-                finally:
-                    await page.close()
-            await browser.close()
-
-
-class MulticinesScraper(Scraper):
-    company_name = "Multicines"
-
-    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
-        # Multicines-specific scraping logic
-        pass
+from app.database import save_screenings
+from app.entities import CinemaComplex, Movie, Screening
+from app.logging import logger
+from app.scrapers.base import Scraper
 
 
 class SupercinesScraper(Scraper):
     company_name = "Supercines"
 
-    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
-        scripts: list[ElementHandle] = await page.query_selector_all("script")
+    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
+        url = f"{complex.company.base_url}{complex.url_part}"
+        logger.info(f"Scraping complex: {url}")
+        page.goto(url, wait_until="networkidle")
+
+        scripts: list[ElementHandle] = page.query_selector_all("script")
 
         script_content = None
 
         for script in scripts:
-            content: str | None = await script.text_content()
+            content: str | None = script.text_content()
             if content and "self.__next_f.push" in content and "initialData" in content:
                 script_content = content
                 break
