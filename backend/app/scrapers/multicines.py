@@ -1,16 +1,16 @@
 # - MulticinesScraper: Scraper for Multicines website.
 import sys
-from datetime import datetime, date, timedelta, time
+from datetime import date, datetime, time, timedelta
 from typing import TypedDict
-from urllib.parse import urlparse, parse_qs, urlunparse
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 import requests
 from playwright.sync_api import Page
 
+from app.database import save_screenings
 from app.entities import CinemaComplex, Movie, Screening
 from app.logging import logger
 from app.scrapers.base import Scraper
-from app.database import save_screenings
 
 
 class ScreeningsResponseDict(TypedDict):
@@ -63,9 +63,7 @@ class MulticinesScraper(Scraper):
 
             captured_request = page.wait_for_event(
                 "request",
-                lambda request: (
-                    "multicines.api.x-mart.io/api/multicines-mw/sessions" in request.url
-                ),
+                lambda request: "multicines.api.x-mart.io/api/multicines-mw/sessions" in request.url,
             )
 
             request_headers: dict[str, str] = captured_request.headers
@@ -74,9 +72,7 @@ class MulticinesScraper(Scraper):
             request_query_params: dict[str, list[str]] = parse_qs(parsed_url.query)
 
             # Reconstruct the base API URL WITHOUT the query string
-            base_api_url = urlunparse(
-                (parsed_url.scheme, parsed_url.netloc, parsed_url.path, "", "", "")
-            )
+            base_api_url = urlunparse((parsed_url.scheme, parsed_url.netloc, parsed_url.path, "", "", ""))
 
             today = date.today()
             for i in range(7):
@@ -98,24 +94,16 @@ class MulticinesScraper(Scraper):
                 )
 
                 if screenings_response.status_code == 200:
-                    screenings_json: list[ScreeningsResponseDict] = (
-                        screenings_response.json()
-                    )
+                    screenings_json: list[ScreeningsResponseDict] = screenings_response.json()
                     for screening_json in screenings_json:
                         screening_language: str = screening_json["name"]
-                        screening_theater_types: list[ScreeningTheaterTypeDict] = (
-                            screening_json["theaterTypes"]
-                        )
+                        screening_theater_types: list[ScreeningTheaterTypeDict] = screening_json["theaterTypes"]
                         for screening_theater_type in screening_theater_types:
                             screening_format: str = screening_theater_type["name"]
-                            screening_sessions: list[ScreeningSessionDict] = (
-                                screening_theater_type["sessions"]
-                            )
+                            screening_sessions: list[ScreeningSessionDict] = screening_theater_type["sessions"]
                             for screening_session in screening_sessions:
                                 screening_datetime = screening_session["showtime"]
-                                logger.info(
-                                    f"screening_datetime : {screening_datetime}"
-                                )
+                                logger.info(f"screening_datetime : {screening_datetime}")
                                 screening = Screening(
                                     datetime=datetime.fromisoformat(screening_datetime),
                                     format=screening_format,
@@ -125,13 +113,9 @@ class MulticinesScraper(Scraper):
                                 )
                                 movie_screenings.append(screening)
                 else:
-                    logger.error(
-                        f"Error {screenings_response.status_code}: {screenings_response.text}"
-                    )
+                    logger.error(f"Error {screenings_response.status_code}: {screenings_response.text}")
 
-                logger.info(
-                    f"Movie {movie.title} has {len(movie_screenings)} screenings"
-                )
+                logger.info(f"Movie {movie.title} has {len(movie_screenings)} screenings")
 
                 screenings.extend(movie_screenings)
 

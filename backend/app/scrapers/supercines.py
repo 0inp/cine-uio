@@ -5,7 +5,7 @@ import sys
 from datetime import date, datetime, timedelta
 
 import requests
-from playwright.sync_api import Page, ElementHandle
+from playwright.sync_api import ElementHandle, Page
 
 from app.database import save_screenings
 from app.entities import CinemaComplex, Movie, Screening
@@ -32,14 +32,10 @@ class SupercinesScraper(Scraper):
                 break
 
         if not script_content:
-            logger.warning(
-                "No script content found containing 'self.__next_f.push' and 'initialData'"
-            )
+            logger.warning("No script content found containing 'self.__next_f.push' and 'initialData'")
             return
 
-        sanitized_script_content: str = script_content.replace("\\n", "").replace(
-            "\\", ""
-        )
+        sanitized_script_content: str = script_content.replace("\\n", "").replace("\\", "")
         try:
             json_match: re.Match | None = re.search(
                 r'.*?("initialData".*)\}\]\]"\]\)',
@@ -53,9 +49,7 @@ class SupercinesScraper(Scraper):
             # Clean and parse the JSON
             json_str: str = "{" + json_match.group(1) + "}"
 
-            movies_data: list[dict[str, str | int | None]] = json.loads(json_str).get(
-                "initialData", []
-            )
+            movies_data: list[dict[str, str | int | None]] = json.loads(json_str).get("initialData", [])
 
             today: datetime = datetime.now()
             six_days_later: datetime = today + timedelta(days=6)
@@ -79,7 +73,9 @@ class SupercinesScraper(Scraper):
                 movies.append(movie)
 
                 supercines_movie_id: str = str(movie_data.get("id"))
-                base_xhr_url = f"https://www.supercines.com/api/proxy/movies/tecnologies?Id={supercines_movie_id}&Channel=web"
+                base_xhr_url = (
+                    f"https://www.supercines.com/api/proxy/movies/tecnologies?Id={supercines_movie_id}&Channel=web"
+                )
 
                 while current_date < six_days_later.date():
                     date_query_param: str = current_date.strftime("%Y-%m-%d")
@@ -99,13 +95,9 @@ class SupercinesScraper(Scraper):
                     for tecnology in tecnologies:
                         screening_format: str = tecnology.get("tecnology", "")
                         screening_language: str = tecnology.get("tecnology", "")
-                        tecnology_schedules: list[dict[str, int | str | bool]] = (
-                            tecnology.get("schedules", [])
-                        )
+                        tecnology_schedules: list[dict[str, int | str | bool]] = tecnology.get("schedules", [])
                         for tecnology_schedule in tecnology_schedules:
-                            tecnology_schedule_time: str = str(
-                                tecnology_schedule.get("time", "")
-                            )
+                            tecnology_schedule_time: str = str(tecnology_schedule.get("time", ""))
                             if not tecnology_schedule_time:
                                 break
                             screening_datetime: datetime = datetime.strptime(
@@ -123,16 +115,12 @@ class SupercinesScraper(Scraper):
 
                     current_date += timedelta(days=1)
 
-                logger.info(
-                    f"Movie {movie_title} has {len(movie_screenings)} screenings"
-                )
+                logger.info(f"Movie {movie_title} has {len(movie_screenings)} screenings")
                 screenings.extend(movie_screenings)
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON parsing error: {e}")
-            logger.debug(
-                f"Failed to parse JSON: {json_str[:200]}..."
-            )  # Log first 200 chars for debugging
+            logger.debug(f"Failed to parse JSON: {json_str[:200]}...")  # Log first 200 chars for debugging
             return
         except Exception as e:
             logger.error(f"Unexpected error during scraping: {e}")
