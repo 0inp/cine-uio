@@ -65,23 +65,26 @@ function App() {
 		return screeningDateUTC === todayUTC;
 	});
 
-	// Group screenings by movie, then by company+complex
-	const groupedData = todaysScreenings.reduce(
-		(acc, screening) => {
-			const movieTitle = screening.movie.title;
-			const companyComplexKey = `${screening.complex.company.name} - ${screening.complex.name}`;
+  // Group screenings by movie, then by company+complex
+  const groupedData = todaysScreenings.reduce(
+    (acc, screening) => {
+      const movieTitle = screening.movie.title;
+      const companyComplexKey = `${screening.complex.company.name} - ${screening.complex.name}`;
 
-			if (!acc[movieTitle]) {
-				acc[movieTitle] = {};
-			}
-			if (!acc[movieTitle][companyComplexKey]) {
-				acc[movieTitle][companyComplexKey] = [];
-			}
-			acc[movieTitle][companyComplexKey].push(screening);
-			return acc;
-		},
-		{} as Record<string, Record<string, Screening[]>>,
-	);
+      if (!acc[movieTitle]) {
+        acc[movieTitle] = {};
+      }
+      if (!acc[movieTitle][companyComplexKey]) {
+        acc[movieTitle][companyComplexKey] = [];
+      }
+      acc[movieTitle][companyComplexKey].push(screening);
+      return acc;
+    },
+    {} as Record<string, Record<string, Screening[]>>,
+  );
+
+  // Sort movies alphabetically by title
+  const sortedMovieTitles = Object.keys(groupedData).sort((a, b) => a.localeCompare(b));
 
 	const renderScreenings = (screenings: Screening[]) => {
 		if (!screenings || screenings.length === 0) {
@@ -101,29 +104,29 @@ function App() {
 		));
 	};
 
-	return (
-		<div className="app">
-			<h1 className="title">Cine UIO</h1>
-			{Object.entries(groupedData).map(([movieTitle, companyComplexes]) => (
-				<div key={movieTitle} className="movie-card">
-					<h3 className="movie-title">{movieTitle}</h3>
-					{Object.entries(companyComplexes).map(
-						([companyComplexKey, screenings]) => (
-							<div
-								key={`${movieTitle}-${companyComplexKey}`}
-								className="company-complex-section"
-							>
-								<h4 className="company-complex-name">{companyComplexKey}</h4>
-								<div className="screenings-list">
-									{renderScreenings(screenings)}
-								</div>
-							</div>
-						),
-					)}
-				</div>
-			))}
-		</div>
-	);
+  return (
+    <div className="app">
+      <h1 className="title">Cine UIO</h1>
+      {sortedMovieTitles.map((movieTitle) => (
+        <div key={movieTitle} className="movie-card">
+          <h3 className="movie-title">{movieTitle}</h3>
+          {Object.entries(groupedData[movieTitle]).map(
+            ([companyComplexKey, screenings]) => (
+              <div
+                key={`${movieTitle}-${companyComplexKey}`}
+                className="company-complex-section"
+              >
+                <h4 className="company-complex-name">{companyComplexKey}</h4>
+                <div className="screenings-list">
+                  {renderScreenings(screenings)}
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default App;
