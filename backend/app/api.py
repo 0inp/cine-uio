@@ -30,9 +30,7 @@ def get_screenings(
     db: Session = Depends(get_db),
 ) -> list[ScreeningSchema]:
 
-    screenings: list[Screening] = get_all_screenings(
-        db, cinema_company_name, cinema_complex_name
-    )
+    screenings: list[Screening] = get_all_screenings(db, cinema_company_name, cinema_complex_name)
 
     # Convert dataclass entities to dictionaries
     screenings_schemas: list[ScreeningSchema] = []

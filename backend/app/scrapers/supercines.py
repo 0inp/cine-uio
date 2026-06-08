@@ -1,113 +1,41 @@
-# """
-# Playwright scrapers for cinema data.
-#
-# This module contains:
-# - Scraper: Abstract base class factory for scrapers.
-# - MulticinesScraper: Scraper for Multicines website.
 # - SupercinesScraper: Scraper for Supercines website.
-# """
 import json
-import logging
 import re
 import sys
-from abc import ABC, abstractmethod
 from datetime import date, datetime, timedelta
-from typing import ClassVar, Type
 
 import requests
-from playwright.async_api import Browser, ElementHandle, Page, async_playwright
-from sqlalchemy.orm import Session
+from playwright.sync_api import ElementHandle, Page
 
-from app.database import (
-    SessionLocal,
-    delete_all_screenings,
-    get_all_cinema_complexes_from_cinema_company,
-    save_screenings,
-)
-from app.entities import CinemaCompany, CinemaComplex, Movie, Screening
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-class Scraper(ABC):
-    company_name: ClassVar[str]
-    _registry: ClassVar[dict[str, Type["Scraper"]]] = {}
-
-    def __init_subclass__(cls: Type[Scraper], **kwargs: object) -> None:
-        super().__init_subclass__(**kwargs)
-        if hasattr(cls, "company_name"):
-            cls._registry[cls.company_name] = cls
-
-    @classmethod
-    def create(cls, company: CinemaCompany) -> Scraper:
-        scraper_cls = cls._registry.get(company.name)
-        if scraper_cls is None:
-            raise ValueError(f"No scraper registered for company: {company.name}")
-        return scraper_cls(company)
-
-    def __init__(self, company: CinemaCompany) -> None:
-        self.company: CinemaCompany = company
-        self.db: Session = SessionLocal()
-
-    @abstractmethod
-    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
-        pass
-
-    async def run_scrape(self) -> None:
-        logger.info("Deleting all screenings to start from scratch")
-        delete_all_screenings(self.db)
-        logger.info(f"Starting to scrape company: {self.company.name}")
-
-        async with async_playwright() as p:
-            browser: Browser = await p.chromium.launch(headless=False)
-            complexes: list[CinemaComplex] = (
-                get_all_cinema_complexes_from_cinema_company(self.db, self.company.name)
-            )
-            for complex in complexes:
-                url = f"{self.company.base_url}{complex.url_part}"
-                logger.info(f"Scraping complex: {url}")
-                page: Page = await browser.new_page()
-                try:
-                    await page.goto(url, wait_until="networkidle")
-                    await self._scrape_complex_page(page, complex)
-                finally:
-                    await page.close()
-            await browser.close()
-
-
-class MulticinesScraper(Scraper):
-    company_name = "Multicines"
-
-    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
-        # Multicines-specific scraping logic
-        pass
+from app.database import save_screenings
+from app.entities import CinemaComplex, Movie, Screening
+from app.logging import logger
+from app.scrapers.base import Scraper
 
 
 class SupercinesScraper(Scraper):
     company_name = "Supercines"
 
-    async def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
-        scripts: list[ElementHandle] = await page.query_selector_all("script")
+    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
+        url = f"{complex.company.base_url}{complex.url_part}"
+        logger.info(f"Scraping complex: {url}")
+        page.goto(url, wait_until="networkidle")
+
+        scripts: list[ElementHandle] = page.query_selector_all("script")
 
         script_content = None
 
         for script in scripts:
-            content: str | None = await script.text_content()
+            content: str | None = script.text_content()
             if content and "self.__next_f.push" in content and "initialData" in content:
                 script_content = content
                 break
 
         if not script_content:
-            logger.warning(
-                "No script content found containing 'self.__next_f.push' and 'initialData'"
-            )
+            logger.warning("No script content found containing 'self.__next_f.push' and 'initialData'")
             return
 
-        sanitized_script_content: str = script_content.replace("\\n", "").replace(
-            "\\", ""
-        )
+        sanitized_script_content: str = script_content.replace("\\n", "").replace("\\", "")
         try:
             json_match: re.Match | None = re.search(
                 r'.*?("initialData".*)\}\]\]"\]\)',
@@ -121,9 +49,7 @@ class SupercinesScraper(Scraper):
             # Clean and parse the JSON
             json_str: str = "{" + json_match.group(1) + "}"
 
-            movies_data: list[dict[str, str | int | None]] = json.loads(json_str).get(
-                "initialData", []
-            )
+            movies_data: list[dict[str, str | int | None]] = json.loads(json_str).get("initialData", [])
 
             today: datetime = datetime.now()
             six_days_later: datetime = today + timedelta(days=6)
@@ -147,7 +73,9 @@ class SupercinesScraper(Scraper):
                 movies.append(movie)
 
                 supercines_movie_id: str = str(movie_data.get("id"))
-                base_xhr_url = f"https://www.supercines.com/api/proxy/movies/tecnologies?Id={supercines_movie_id}&Channel=web"
+                base_xhr_url = (
+                    f"https://www.supercines.com/api/proxy/movies/tecnologies?Id={supercines_movie_id}&Channel=web"
+                )
 
                 while current_date < six_days_later.date():
                     date_query_param: str = current_date.strftime("%Y-%m-%d")
@@ -167,13 +95,9 @@ class SupercinesScraper(Scraper):
                     for tecnology in tecnologies:
                         screening_format: str = tecnology.get("tecnology", "")
                         screening_language: str = tecnology.get("tecnology", "")
-                        tecnology_schedules: list[dict[str, int | str | bool]] = (
-                            tecnology.get("schedules", [])
-                        )
+                        tecnology_schedules: list[dict[str, int | str | bool]] = tecnology.get("schedules", [])
                         for tecnology_schedule in tecnology_schedules:
-                            tecnology_schedule_time: str = str(
-                                tecnology_schedule.get("time", "")
-                            )
+                            tecnology_schedule_time: str = str(tecnology_schedule.get("time", ""))
                             if not tecnology_schedule_time:
                                 break
                             screening_datetime: datetime = datetime.strptime(
@@ -191,16 +115,12 @@ class SupercinesScraper(Scraper):
 
                     current_date += timedelta(days=1)
 
-                logger.info(
-                    f"Movie {movie_title} has {len(movie_screenings)} screenings"
-                )
+                logger.info(f"Movie {movie_title} has {len(movie_screenings)} screenings")
                 screenings.extend(movie_screenings)
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON parsing error: {e}")
-            logger.debug(
-                f"Failed to parse JSON: {json_str[:200]}..."
-            )  # Log first 200 chars for debugging
+            logger.debug(f"Failed to parse JSON: {json_str[:200]}...")  # Log first 200 chars for debugging
             return
         except Exception as e:
             logger.error(f"Unexpected error during scraping: {e}")

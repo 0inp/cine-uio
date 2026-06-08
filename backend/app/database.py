@@ -1,5 +1,6 @@
+from collections.abc import Generator
 from datetime import datetime
-from typing import Generator, cast
+from typing import cast
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.ext.declarative import declarative_base
@@ -26,15 +27,13 @@ from app.models import (
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./cine_uio.db"
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session]:
     db = SessionLocal()
     try:
         yield db
@@ -63,9 +62,7 @@ def get_all_screenings(
             .where(CinemaCompanyModel.name == cinema_company_name)
         )
     if cinema_complex_name:
-        query = query.join(ScreeningModel.complex).where(
-            CinemaComplexModel.name == cinema_complex_name
-        )
+        query = query.join(ScreeningModel.complex).where(CinemaComplexModel.name == cinema_complex_name)
 
     result = db.execute(query)
     orm_screenings: list[ScreeningModel] = list(result.scalars().all())
@@ -105,9 +102,7 @@ def get_all_screenings(
     ]
 
 
-def get_all_cinema_companies(
-    db: Session, cinema_company_name: str | None = None
-) -> list[CinemaCompany]:
+def get_all_cinema_companies(db: Session, cinema_company_name: str | None = None) -> list[CinemaCompany]:
     query = select(CinemaCompanyModel)
     if cinema_company_name:
         query = query.where(CinemaCompanyModel.name == cinema_company_name)
@@ -125,9 +120,7 @@ def get_all_cinema_companies(
     return companies
 
 
-def get_all_cinema_complexes_from_cinema_company(
-    db: Session, cinema_company_name: str
-) -> list[CinemaComplex]:
+def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_name: str) -> list[CinemaComplex]:
     query = (
         select(CinemaComplexModel)
         .join(CinemaComplexModel.company)
@@ -155,15 +148,13 @@ def save_screenings(db: Session, screenings: list[Screening]) -> None:
     # Fetch all existing movies in a single query
     existing_movies_result = db.execute(select(MovieModel))
     existing_movies: dict[str, int] = {
-        str(movie.title): cast(int, movie.id)
-        for movie in existing_movies_result.scalars().all()
+        str(movie.title): cast(int, movie.id) for movie in existing_movies_result.scalars().all()
     }
 
     # Fetch all existing complexes in a single query
     existing_complexes_result = db.execute(select(CinemaComplexModel))
     existing_complexes: dict[str, int] = {
-        cast(str, complex.name): cast(int, complex.id)
-        for complex in existing_complexes_result.scalars().all()
+        cast(str, complex.name): cast(int, complex.id) for complex in existing_complexes_result.scalars().all()
     }
 
     for screening in screenings:
