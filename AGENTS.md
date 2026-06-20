@@ -10,4 +10,4 @@ Default triage labels are used (`needs-triage`, `needs-info`, `ready-for-agent`,
 
 ### Domain docs
 
-Single-context layout (`CONTEXT.md` + `docs/adr/` at the root). See `docs/agents/domain.md`.
+Single-context layout (`docs/CONTEXT.md` + `docs/adr/`). See `docs/agents/domain.md`.

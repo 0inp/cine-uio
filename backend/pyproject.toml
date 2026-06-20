@@ -1,7 +1,7 @@
 [project]
 name = "cine-uio"
 version = "0.1.0"
-description = "Add your description here"
+description = "Backend API and scrapers for Cine UIO — movie screening aggregator for Quito, Ecuador"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
