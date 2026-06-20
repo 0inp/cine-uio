@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class CinemaCompanySchema(BaseModel):
@@ -19,11 +19,10 @@ class MovieSchema(BaseModel):
 
 
 class ScreeningSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     datetime: datetime
     format: str
     language: str
     complex: CinemaComplexSchema
     movie: MovieSchema
-
-    class Config:
-        from_attributes = True
