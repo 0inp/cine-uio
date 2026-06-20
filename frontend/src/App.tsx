@@ -92,8 +92,8 @@ function App() {
     if (!screenings || screenings.length === 0) {
       return <div>No screenings available</div>;
     }
-    return screenings.map((screening, _) => (
-      <div key={screening.datetime} className="screening-item">
+    return screenings.map((screening) => (
+      <div key={`${screening.datetime}-${screening.format}-${screening.language}`} className="screening-item">
         <span className="screening-time">
           {new Date(screening.datetime).toLocaleTimeString([], {
             hour: "2-digit",
