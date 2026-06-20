@@ -83,14 +83,15 @@ class SupercinesScraper(Scraper):
 
                     response = requests.get(xhr_url)
                     if not response.status_code == 200:
-                        break
+                        current_date += timedelta(days=1)
+                        continue
 
                     response_data = response.json()
-                    response_content = response_data.get("content", [])
-                    if content:
-                        tecnologies = response_content.get("tecnologies", [])
+                    response_content = response_data.get("content", {})
+                    tecnologies = response_content.get("tecnologies", []) if response_content else []
                     if not tecnologies:
-                        break
+                        current_date += timedelta(days=1)
+                        continue
 
                     for tecnology in tecnologies:
                         screening_format: str = tecnology.get("tecnology", "")
@@ -99,7 +100,7 @@ class SupercinesScraper(Scraper):
                         for tecnology_schedule in tecnology_schedules:
                             tecnology_schedule_time: str = str(tecnology_schedule.get("time", ""))
                             if not tecnology_schedule_time:
-                                break
+                                continue
                             screening_datetime: datetime = datetime.strptime(
                                 date_query_param + " " + tecnology_schedule_time,
                                 "%Y-%m-%d %H:%M",
