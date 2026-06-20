@@ -2,8 +2,7 @@ from collections.abc import Generator
 from datetime import datetime
 from typing import cast
 
-from sqlalchemy import create_engine, select
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 
 from app.entities import (
@@ -30,9 +29,6 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///./cine_uio.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
-
-
 def get_db() -> Generator[Session]:
     db = SessionLocal()
     try:
@@ -55,14 +51,14 @@ def get_all_screenings(
         .order_by(ScreeningModel.datetime)
     )
 
+    if cinema_company_name or cinema_complex_name:
+        query = query.join(ScreeningModel.complex)
+
     if cinema_company_name:
-        query = (
-            query.join(ScreeningModel.complex)
-            .join(CinemaComplexModel.company)
-            .where(CinemaCompanyModel.name == cinema_company_name)
-        )
+        query = query.join(CinemaComplexModel.company).where(CinemaCompanyModel.name == cinema_company_name)
+
     if cinema_complex_name:
-        query = query.join(ScreeningModel.complex).where(CinemaComplexModel.name == cinema_complex_name)
+        query = query.where(CinemaComplexModel.name == cinema_complex_name)
 
     result = db.execute(query)
     orm_screenings: list[ScreeningModel] = list(result.scalars().all())
@@ -190,5 +186,5 @@ def save_screenings(db: Session, screenings: list[Screening]) -> None:
 
 
 def delete_all_screenings(db: Session) -> None:
-    db.query(ScreeningModel).delete()
+    db.execute(delete(ScreeningModel))
     db.commit()
