@@ -48,7 +48,7 @@ def get_screenings(
                 url_part=screening.complex.url_part,
                 company=CinemaCompanySchema(
                     name=screening.complex.company.name,
-                    base_url=screening.complex.company.name,
+                    base_url=screening.complex.company.base_url,
                 ),
             ),
             movie=MovieSchema(title=screening.movie.title),
