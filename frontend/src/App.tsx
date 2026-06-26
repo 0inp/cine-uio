@@ -30,7 +30,7 @@ interface ScreeningItemProps {
   screening: Screening;
 }
 
-function ScreeningItem({ screening }: ScreeningItemProps) {
+export function ScreeningItem({ screening }: ScreeningItemProps) {
   return (
     <div className="screening-item">
       <span className="screening-time">
