@@ -44,7 +44,7 @@ class Scraper(ABC):
 
         try:
             with sync_playwright() as p:
-                browser: Browser = p.chromium.launch(headless=False)
+                browser: Browser = p.chromium.launch(headless=True)
                 complexes: list[CinemaComplex] = get_all_cinema_complexes_from_cinema_company(
                     self.db, self.company.name
                 )

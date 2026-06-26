@@ -35,7 +35,9 @@ class SupercinesScraper(Scraper):
             logger.warning("No script content found containing 'self.__next_f.push' and 'initialData'")
             return
 
-        sanitized_script_content: str = script_content.replace("\\n", "").replace("\\", "")
+        sanitized_script_content: str = re.sub(
+            r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), script_content
+        ).replace("\\n", "").replace("\\", "")
         try:
             json_match: re.Match | None = re.search(
                 r'.*?("initialData".*)\}\]\]"\]\)',
@@ -94,8 +96,10 @@ class SupercinesScraper(Scraper):
                         continue
 
                     for tecnology in tecnologies:
-                        screening_format: str = tecnology.get("tecnology", "")
-                        screening_language: str = tecnology.get("tecnology", "")
+                        tecnology_str: str = tecnology.get("tecnology", "")
+                        parts = tecnology_str.rsplit(" ", 1)
+                        screening_format: str = parts[0] if len(parts) > 1 else tecnology_str
+                        screening_language: str = parts[1] if len(parts) > 1 else ""
                         tecnology_schedules: list[dict[str, int | str | bool]] = tecnology.get("schedules", [])
                         for tecnology_schedule in tecnology_schedules:
                             tecnology_schedule_time: str = str(tecnology_schedule.get("time", ""))
