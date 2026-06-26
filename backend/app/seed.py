@@ -1,3 +1,4 @@
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -7,7 +8,12 @@ from app.models import CinemaCompany, CinemaComplex
 def seed_database() -> None:
     db: Session = SessionLocal()
 
-    # Seed CinemaCompany
+    existing = db.execute(select(CinemaCompany).where(CinemaCompany.name == "Multicines")).scalar_one_or_none()
+    if existing is not None:
+        print("Database already seeded, skipping.")
+        db.close()
+        return
+
     multicines = CinemaCompany(name="Multicines", base_url="https://www.multicines.com.ec")
     supercines = CinemaCompany(name="Supercines", base_url="https://www.supercines.com")
 
@@ -15,7 +21,6 @@ def seed_database() -> None:
     db.add(supercines)
     db.commit()
 
-    # Seed CinemaComplex for Multicines
     cci = CinemaComplex(name="CCI", url_part="/?cityId=19&storeId=3555", company_id=multicines.id)
     plaza_americas = CinemaComplex(
         name="Plaza Americas",
@@ -26,7 +31,6 @@ def seed_database() -> None:
     db.add(cci)
     db.add(plaza_americas)
 
-    # Seed CinemaComplex for Supercines
     san_luis = CinemaComplex(
         name="San Luis",
         url_part="/cartelera/quito/san-luis/216",
