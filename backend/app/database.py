@@ -1,9 +1,8 @@
+import os
 from collections.abc import Generator
-from datetime import datetime
-from typing import cast
 
 from sqlalchemy import create_engine, delete, select
-from sqlalchemy.orm import Session, joinedload, sessionmaker
+from sqlalchemy.orm import Session, contains_eager, selectinload, sessionmaker
 
 from app.entities import (
     CinemaCompany,
@@ -24,10 +23,11 @@ from app.models import (
     Screening as ScreeningModel,
 )
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./cine_uio.db"
+SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./cine_uio.db")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db() -> Generator[Session]:
     db = SessionLocal()
@@ -45,8 +45,8 @@ def get_all_screenings(
     query = (
         select(ScreeningModel)
         .options(
-            joinedload(ScreeningModel.movie),
-            joinedload(ScreeningModel.complex).joinedload(CinemaComplexModel.company),
+            selectinload(ScreeningModel.movie),
+            selectinload(ScreeningModel.complex).selectinload(CinemaComplexModel.company),
         )
         .order_by(ScreeningModel.datetime)
     )
@@ -63,9 +63,9 @@ def get_all_screenings(
     result = db.execute(query)
     orm_screenings: list[ScreeningModel] = list(result.scalars().all())
 
-    companies = {}
-    complexes = {}
-    movies = {}
+    companies: dict[int, CinemaCompany] = {}
+    complexes: dict[int, CinemaComplex] = {}
+    movies: dict[int, Movie] = {}
 
     for s in orm_screenings:
         if s.movie.id not in movies:
@@ -75,22 +75,21 @@ def get_all_screenings(
             companies[s.complex.company.id] = CinemaCompany(
                 name=s.complex.company.name,
                 base_url=s.complex.company.base_url,
-                # complexes=[],
             )
 
         if s.complex.id not in complexes:
-            complex_entity = CinemaComplex(
+            complexes[s.complex.id] = CinemaComplex(
                 name=s.complex.name,
                 url_part=s.complex.url_part,
                 company=companies[s.complex.company.id],
             )
-            complexes[s.complex.id] = complex_entity
 
     return [
         Screening(
-            datetime=cast(datetime, s.datetime),
-            format=cast(str, s.format),
-            language=cast(str, s.language),
+            id=s.id,
+            datetime=s.datetime,
+            format=s.format,
+            language=s.language,
             complex=complexes[s.complex.id],
             movie=movies[s.movie.id],
         )
@@ -105,15 +104,10 @@ def get_all_cinema_companies(db: Session, cinema_company_name: str | None = None
     result = db.execute(query)
     orm_companies = result.unique().scalars().all()
 
-    companies = []
-    for orm_company in orm_companies:
-        company_entity = CinemaCompany(
-            name=cast(str, orm_company.name),
-            base_url=cast(str, orm_company.base_url),
-        )
-        companies.append(company_entity)
-
-    return companies
+    return [
+        CinemaCompany(name=orm_company.name, base_url=orm_company.base_url)
+        for orm_company in orm_companies
+    ]
 
 
 def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_name: str) -> list[CinemaComplex]:
@@ -121,58 +115,51 @@ def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_nam
         select(CinemaComplexModel)
         .join(CinemaComplexModel.company)
         .where(CinemaCompanyModel.name == cinema_company_name)
+        .options(contains_eager(CinemaComplexModel.company))
     )
     result = db.execute(query)
     orm_complexes = result.unique().scalars().all()
 
-    complexes = []
-    for orm_complex in orm_complexes:
-        complex_entity = CinemaComplex(
-            name=str(orm_complex.name),
-            url_part=str(orm_complex.url_part),
+    return [
+        CinemaComplex(
+            name=orm_complex.name,
+            url_part=orm_complex.url_part,
             company=CinemaCompany(
-                name=cast(str, orm_complex.company.name),
-                base_url=cast(str, orm_complex.company.base_url),
+                name=orm_complex.company.name,
+                base_url=orm_complex.company.base_url,
             ),
         )
-        complexes.append(complex_entity)
-
-    return complexes
+        for orm_complex in orm_complexes
+    ]
 
 
 def save_screenings(db: Session, screenings: list[Screening]) -> None:
-    # Fetch all existing movies in a single query
     existing_movies_result = db.execute(select(MovieModel))
     existing_movies: dict[str, int] = {
-        str(movie.title): cast(int, movie.id) for movie in existing_movies_result.scalars().all()
+        movie.title: movie.id for movie in existing_movies_result.scalars().all()
     }
 
-    # Fetch all existing complexes in a single query
     existing_complexes_result = db.execute(select(CinemaComplexModel))
     existing_complexes: dict[str, int] = {
-        cast(str, complex.name): cast(int, complex.id) for complex in existing_complexes_result.scalars().all()
+        complex.name: complex.id for complex in existing_complexes_result.scalars().all()
     }
 
     for screening in screenings:
-        # Check if the movie already exists in the database
         if screening.movie.title not in existing_movies:
             new_movie = MovieModel(title=screening.movie.title)
             db.add(new_movie)
             db.flush()
             db.refresh(new_movie)
-            existing_movies[screening.movie.title] = cast(int, new_movie.id)
+            existing_movies[screening.movie.title] = new_movie.id
 
-        # Get the existing movie model
         movie_model_id = existing_movies[screening.movie.title]
 
-        # Find the complex model
         if screening.complex.name not in existing_complexes:
             raise ValueError(
                 f"Complex {screening.complex.name} with company {screening.complex.company.name} not found in the database."
             )
         complex_model_id = existing_complexes[screening.complex.name]
 
-        # Create and save the screening
         screening_model = ScreeningModel(
             datetime=screening.datetime,
             format=screening.format,

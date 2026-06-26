@@ -27,3 +27,4 @@ class Screening:
     language: str
     complex: CinemaComplex
     movie: Movie
+    id: int = 0
