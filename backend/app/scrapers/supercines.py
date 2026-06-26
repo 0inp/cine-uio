@@ -132,8 +132,6 @@ class SupercinesScraper(Scraper):
         except Exception as e:
             logger.error(f"Error saving screenings during scraping: {e}", exc_info=True)
             sys.exit(1)
-        finally:
-            self.db.close()
 
         logger.info(
             f"{len(movies)} movies have been processed, with a total of {len(screenings)} screenings for {complex.name}"

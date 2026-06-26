@@ -1,5 +1,7 @@
 # - MulticinesScraper: Scraper for Multicines website.
+import re
 import sys
+import unicodedata
 from datetime import date, datetime, time, timedelta
 from typing import TypedDict
 from urllib.parse import parse_qs, urlparse, urlunparse
@@ -25,6 +27,12 @@ class ScreeningTheaterTypeDict(TypedDict):
 
 class ScreeningSessionDict(TypedDict):
     showtime: str
+
+
+def _title_to_slug(title: str) -> str:
+    normalized = unicodedata.normalize("NFD", title)
+    ascii_str = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    return re.sub(r"[^a-z0-9]+", "-", ascii_str.lower()).strip("-")
 
 
 class MulticinesScraper(Scraper):
@@ -57,7 +65,7 @@ class MulticinesScraper(Scraper):
         screenings: list[Screening] = []
         for movie_id, movie in movies_by_multicines_ids.items():
             movie_screenings: list[Screening] = []
-            movie_url = f"{complex.company.base_url}/movie/{movie.title.lower().replace(' ', '-')}/{movie_id}"
+            movie_url = f"{complex.company.base_url}/movie/{_title_to_slug(movie.title)}/{movie_id}"
             logger.info(f"Navigating to movie: {movie_url}")
             page.goto(movie_url)
 
@@ -123,8 +131,6 @@ class MulticinesScraper(Scraper):
         except Exception as e:
             logger.error(f"Error saving screenings during scraping: {e}", exc_info=True)
             sys.exit(1)
-        finally:
-            self.db.close()
 
         logger.info(
             f"{len(movies)} movies have been processed, with a total of {len(screenings)} screenings for {complex.name}"

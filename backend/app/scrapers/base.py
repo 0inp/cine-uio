@@ -40,16 +40,24 @@ class Scraper(ABC):
         pass
 
     def run_scrape(self) -> None:
-        logger.info("Deleting all screenings to start from scratch")
         logger.info(f"Starting to scrape company: {self.company.name}")
 
-        with sync_playwright() as p:
-            browser: Browser = p.chromium.launch(headless=False)
-            complexes: list[CinemaComplex] = get_all_cinema_complexes_from_cinema_company(self.db, self.company.name)
-            for complex in complexes:
+        try:
+            with sync_playwright() as p:
+                browser: Browser = p.chromium.launch(headless=False)
+                complexes: list[CinemaComplex] = get_all_cinema_complexes_from_cinema_company(
+                    self.db, self.company.name
+                )
                 try:
-                    page: Page = browser.new_page()
-                    self._scrape_complex_page(page, complex)
+                    for complex in complexes:
+                        page: Page | None = None
+                        try:
+                            page = browser.new_page()
+                            self._scrape_complex_page(page, complex)
+                        finally:
+                            if page is not None:
+                                page.close()
                 finally:
-                    page.close()
-            browser.close()
+                    browser.close()
+        finally:
+            self.db.close()
