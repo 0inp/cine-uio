@@ -1,10 +1,13 @@
+from collections.abc import Iterator
 from datetime import datetime
+from unittest.mock import patch
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.database import get_all_screenings, save_screenings
 from app.entities import CinemaCompany, CinemaComplex, Movie, Screening
-from app.scrape import ComplexScrapeResult, apply_scrape_results
+from app.scrape import ComplexScrapeResult, apply_scrape_results, scrape_and_publish
 
 
 def _screening(title: str, complex_name: str, company_name: str) -> Screening:
@@ -79,3 +82,47 @@ class TestApplyScrapeResults:
 
         assert len(failures) == 1
         assert [s.movie.title for s in get_all_screenings(bare_db)] == ["Yesterday CCI"]
+
+
+class TestScrapeAndPublish:
+    """A country-wide run takes over an hour, so each complex is published the moment
+    it is scraped rather than after every venue has been visited."""
+
+    def test_a_complex_is_published_before_the_run_finishes(self, bare_db: Session) -> None:
+        def results() -> Iterator[ComplexScrapeResult]:
+            yield _ok("Early film", "CCI", "Multicines")
+            raise RuntimeError("scraper died halfway")
+
+        with patch("app.scrape.run_all_scrapes", return_value=results()):
+            with pytest.raises(RuntimeError):
+                scrape_and_publish(bare_db)
+
+        # Work done before the crash survives it.
+        assert [s.movie.title for s in get_all_screenings(bare_db)] == ["Early film"]
+
+    def test_reports_failures_without_stopping(self, bare_db: Session) -> None:
+        def results() -> Iterator[ComplexScrapeResult]:
+            yield _failed("CCI", "Multicines")
+            yield _ok("Late film", "San Luis", "Supercines")
+
+        with patch("app.scrape.run_all_scrapes", return_value=results()):
+            failures = scrape_and_publish(bare_db)
+
+        assert len(failures) == 1
+        assert [s.movie.title for s in get_all_screenings(bare_db)] == ["Late film"]
+
+    def test_does_not_hold_every_result_in_memory(self, bare_db: Session) -> None:
+        # The generator must be consumed lazily: each result is published as it
+        # arrives, so the source is never fully materialised.
+        published: list[str] = []
+
+        def results() -> Iterator[ComplexScrapeResult]:
+            yield _ok("First", "CCI", "Multicines")
+            published.append(str([s.movie.title for s in get_all_screenings(bare_db)]))
+            yield _ok("Second", "San Luis", "Supercines")
+
+        with patch("app.scrape.run_all_scrapes", return_value=results()):
+            scrape_and_publish(bare_db)
+
+        # Observed from inside the generator, after the first yield was consumed.
+        assert published == ["['First']"]

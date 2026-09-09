@@ -12,7 +12,7 @@ load_dotenv()
 
 from app.database import SessionLocal, enrich_movies_with_tmdb  # noqa: E402
 from app.logging import logger  # noqa: E402
-from app.scrape import apply_scrape_results, run_all_scrapes  # noqa: E402
+from app.scrape import scrape_and_publish  # noqa: E402
 
 
 def main() -> None:
@@ -20,8 +20,7 @@ def main() -> None:
     failures: list[str] = []
 
     try:
-        results = run_all_scrapes(db_session)
-        failures = apply_scrape_results(db_session, results)
+        failures = scrape_and_publish(db_session)
     except Exception as e:
         logger.error(f"Scraping failed: {e}", exc_info=True)
         db_session.close()
