@@ -1,4 +1,6 @@
 backend/cine_uio.db
+backend/cine_uio.db-wal
+backend/cine_uio.db-shm
 
 # Python
 __pycache__/
@@ -8,6 +10,8 @@ __pycache__/
 .env
 .env.*
 !.env.example
+# Not a secret: it points the production build at the same-origin /api.
+!frontend/.env.production
 
 # Build artifacts
 *.tsbuildinfo

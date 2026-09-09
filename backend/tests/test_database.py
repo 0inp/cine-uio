@@ -1,12 +1,14 @@
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.database import (
     MAX_TMDB_ATTEMPTS,
+    configure_sqlite,
     delete_all_screenings,
     enrich_movies_with_tmdb,
     get_all_cinema_companies,
@@ -222,6 +224,22 @@ class TestTmdbAttemptPolicy:
 
         enriched = bare_db.execute(select(MovieModel).where(MovieModel.title == "Toy Story 5")).scalar_one()
         assert enriched.tmdb_id == 862
+
+
+class TestSqliteConfiguration:
+    def test_connections_use_wal_journal_mode(self, tmp_path: Path) -> None:
+        # The daily scrape rewrites every screening while the API may be serving
+        # reads. In the default `delete` journal mode a writer blocks readers.
+        engine = create_engine(f"sqlite:///{tmp_path / 'wal.db'}")
+        configure_sqlite(engine)
+        with engine.connect() as conn:
+            assert conn.exec_driver_sql("PRAGMA journal_mode").scalar_one() == "wal"
+
+    def test_connections_wait_instead_of_failing_on_a_locked_database(self, tmp_path: Path) -> None:
+        engine = create_engine(f"sqlite:///{tmp_path / 'busy.db'}")
+        configure_sqlite(engine)
+        with engine.connect() as conn:
+            assert conn.exec_driver_sql("PRAGMA busy_timeout").scalar_one() > 0
 
 
 class TestDeleteAllScreenings:

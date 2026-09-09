@@ -59,3 +59,51 @@ dir = "{{cwd}}/frontend"
 [tasks.test]
 description = "test application"
 depends = ["backend_test", "frontend_test"]
+
+# --- Running the app -------------------------------------------------------
+# `dev` serves the frontend from Vite on its own port (two origins, CORS applies).
+# `start` serves the built SPA from FastAPI on a single origin — that is what
+# `serve` then exposes on the tailnet. See docs/CONTEXT.md.
+
+[tasks.dev_backend]
+description = "API with autoreload"
+run = "uv run uvicorn app.api:app --reload"
+dir = "{{cwd}}/backend"
+
+[tasks.dev_frontend]
+description = "Vite dev server"
+run = "bun dev"
+dir = "{{cwd}}/frontend"
+
+[tasks.dev]
+description = "Run the app for development (API + Vite, two origins)"
+depends = ["dev_backend", "dev_frontend"]
+
+[tasks.build]
+description = "Build the frontend for production"
+run = "bun run build"
+dir = "{{cwd}}/frontend"
+
+[tasks.start]
+description = "Serve the built SPA and the API from a single origin on :8000"
+depends = ["build"]
+# Binds to loopback on purpose: `tailscale serve` proxies from the tailnet to
+# localhost, so the port never needs to be exposed on the local network.
+run = "uv run uvicorn app.api:app --host 127.0.0.1 --port 8000"
+dir = "{{cwd}}/backend"
+
+[tasks.serve]
+description = "Expose the running site on the tailnet over HTTPS"
+run = [
+  "tailscale serve --bg 8000",
+  "tailscale serve status",
+]
+
+[tasks.unserve]
+description = "Stop exposing the site on the tailnet"
+run = "tailscale serve reset"
+
+[tasks.scrape]
+description = "Refresh screenings and TMDB metadata"
+run = "uv run python scraper_entrypoint.py"
+dir = "{{cwd}}/backend"

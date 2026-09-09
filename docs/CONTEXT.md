@@ -50,6 +50,41 @@ cine-uio/
 4. **Serve**: `main.py` / `app/api.py` exposes `GET /api/screenings` (with optional `cinema_company_name` and `cinema_complex_name` filters).
 5. **Display**: Frontend fetches all screenings, filters to today's date (Ecuador TZ), groups by `tmdb_id` (falling back to scraped title), displays the canonical `tmdb_title`, and renders poster, runtime, certification, and overview alongside showtimes. When today has no screenings, it falls back to the nearest *upcoming* date — never a past one — and shows an empty state if nothing is upcoming.
 
+## Running in "Production" (a laptop)
+
+Production is currently a developer laptop reachable over Tailscale. See
+`docs/hosting.md` for the deferred plan to move it somewhere public.
+
+```bash
+mise run start    # build the SPA, serve it and the API from :8000 (single origin)
+mise run serve    # expose that port on the tailnet over HTTPS
+mise run unserve  # stop exposing it
+```
+
+`start` binds to loopback on purpose — `tailscale serve` proxies from the tailnet
+to localhost, so the port is never open on the local network. The site is then at
+`https://<machine>.<tailnet>.ts.net`, reachable from any device signed into the
+tailnet, including a phone on mobile data.
+
+Single origin is what makes this simple: `VITE_API_URL` is the relative `/api`
+(see `frontend/.env.production`), so the build works under any hostname and no
+CORS configuration is involved. FastAPI mounts `frontend/dist` at `/`, after the
+API routes, so `/api/*` still resolves and an unknown API path still 404s.
+
+The daily refresh runs through a launchd agent:
+
+```bash
+./ops/install-scrape-agent.sh          # daily at 05:00
+./ops/install-scrape-agent.sh 7 30     # or at 07:30
+./ops/install-scrape-agent.sh --uninstall
+launchctl kickstart -p gui/$(id -u)/dev.cine-uio.scrape   # run it now
+```
+
+Logs go to `~/Library/Logs/cine-uio/scrape.log`. If the laptop is asleep or off at
+the scheduled time, launchd runs the job at the next opportunity rather than
+skipping the day. The site itself is unreachable while the laptop sleeps — that is
+inherent to hosting on a laptop.
+
 ## Running Locally
 
 ```bash
@@ -115,7 +150,7 @@ mise test     # pytest (backend) + vitest (frontend)
 
 ## Known Constraints
 
-- SQLite is the database — single-file, no concurrency concerns at this scale.
+- SQLite is the database — single-file, no concurrency concerns at this scale. Connections are put in **WAL** journal mode with a 5s `busy_timeout` (`database.configure_sqlite`): the daily scrape rewrites every screening while the API may be serving, and SQLite's default `delete` mode has a writer block readers outright.
 - Scraping uses Playwright to load pages and capture XHR requests; API tokens/headers are harvested from the browser session.
 - `delete_all_screenings` is called at the start of every scrape run (full refresh, no incremental update). `Movie` rows are **not** deleted between runs, so TMDB metadata persists and only new movies need enrichment.
 - The Supercines scraper parses embedded Next.js `__next_f.push` data; this is fragile to site changes.

@@ -1,8 +1,10 @@
 import os
 from collections.abc import Generator
+from typing import Any
 
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, delete, event, select
 from sqlalchemy import update as sa_update
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, contains_eager, selectinload, sessionmaker
 
 from app.entities import (
@@ -30,7 +32,30 @@ SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./cine_uio.d
 # How many times a title may be looked up on TMDB before we stop retrying it.
 MAX_TMDB_ATTEMPTS = 3
 
+
+def configure_sqlite(engine: Engine) -> None:
+    """Put SQLite connections in WAL mode with a patient lock timeout.
+
+    The daily scrape deletes and rewrites every screening while the API may be
+    serving requests. SQLite's default `delete` journal mode has a writer block
+    readers outright; WAL lets them run concurrently. busy_timeout then makes the
+    rare genuine contention wait rather than fail immediately.
+
+    A no-op on other backends, so it stays correct if this ever moves to Postgres.
+    """
+    if not engine.url.get_backend_name().startswith("sqlite"):
+        return
+
+    @event.listens_for(engine, "connect")
+    def _set_pragmas(dbapi_connection: Any, _record: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.close()
+
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+configure_sqlite(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
