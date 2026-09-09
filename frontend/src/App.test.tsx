@@ -236,3 +236,89 @@ describe("TMDB enrichment display", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+
+describe("date fallback when there are no screenings today", () => {
+  it("falls back to the nearest upcoming date", async () => {
+    const future = {
+      ...BASE_SCREENING,
+      id: 3,
+      datetime: `${tomorrow}T18:00:00`,
+      movie: { title: "Supergirl" },
+    };
+    mockFetch([future]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Supergirl")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Sin funciones para hoy/)).toBeInTheDocument();
+  });
+
+  it("picks the earliest upcoming date, not just any future one", async () => {
+    const dayAfter = ecuadorDate(2);
+    mockFetch([
+      {
+        ...BASE_SCREENING,
+        id: 1,
+        datetime: `${dayAfter}T18:00:00`,
+        movie: { title: "Farther Away" },
+      },
+      {
+        ...BASE_SCREENING,
+        id: 2,
+        datetime: `${tomorrow}T18:00:00`,
+        movie: { title: "Closer" },
+      },
+    ]);
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Closer")).toBeInTheDocument());
+    expect(screen.queryByText("Farther Away")).not.toBeInTheDocument();
+  });
+
+  it("never falls back to a past date when the DB is stale", async () => {
+    const yesterday = ecuadorDate(-1);
+    mockFetch([
+      {
+        ...BASE_SCREENING,
+        id: 1,
+        datetime: `${yesterday}T18:00:00`,
+        movie: { title: "Yesterday's Show" },
+      },
+    ]);
+    render(<App />);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/No hay funciones disponibles/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Yesterday's Show")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Sin funciones para hoy/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("prefers today's screenings over upcoming ones", async () => {
+    mockFetch([
+      {
+        ...BASE_SCREENING,
+        id: 1,
+        datetime: `${tomorrow}T18:00:00`,
+        movie: { title: "Tomorrow's Show" },
+      },
+      {
+        ...BASE_SCREENING,
+        id: 2,
+        datetime: `${today}T18:00:00`,
+        movie: { title: "Today's Show" },
+      },
+    ]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Today's Show")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Tomorrow's Show")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Sin funciones para hoy/),
+    ).not.toBeInTheDocument();
+  });
+});
