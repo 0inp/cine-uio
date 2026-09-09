@@ -68,6 +68,12 @@ function displayTitle(movie: Movie): string {
   return movie.tmdb_title ?? movie.title;
 }
 
+interface Health {
+  status: "ok" | "stale" | "failing" | "unknown";
+  detail: string;
+  hours_since_success: number | null;
+}
+
 const DEFAULT_CITY = "Quito";
 const CITY_STORAGE_KEY = "cine-uio.city";
 
@@ -82,6 +88,7 @@ function storedCity(): string {
 function App() {
   const [screenings, setScreenings] = useState<Screening[] | null>(null);
   const [cities, setCities] = useState<string[]>([]);
+  const [health, setHealth] = useState<Health | null>(null);
   const [city, setCity] = useState<string>(storedCity);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +106,21 @@ function App() {
       }
     };
     fetchCities();
+  }, []);
+
+  useEffect(() => {
+    // Without this the app happily shows week-old listings as if they were today's.
+    const fetchHealth = async () => {
+      try {
+        const response = await fetch(`${apiConfig.url}/health`);
+        if (!response.ok) return;
+        setHealth(await response.json());
+      } catch {
+        // If we cannot tell whether the data is fresh, say nothing rather than
+        // claiming a problem that may not exist.
+      }
+    };
+    fetchHealth();
   }, []);
 
   useEffect(() => {
@@ -199,6 +221,17 @@ function App() {
   return (
     <div className="app">
       <h1 className="title">Cine UIO</h1>
+      {health !== null &&
+        health.status !== "ok" &&
+        health.status !== "unknown" && (
+          <p className={`health-notice health-${health.status}`} role="status">
+            {health.status === "failing"
+              ? "Hubo un problema al actualizar la cartelera"
+              : "La cartelera puede estar desactualizada"}
+            {health.hours_since_success !== null &&
+              ` — última actualización hace ${Math.round(health.hours_since_success)} h`}
+          </p>
+        )}
       {cities.length > 1 && (
         <div className="city-picker">
           <label htmlFor="city">Ciudad</label>

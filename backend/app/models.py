@@ -66,3 +66,24 @@ class Screening(Base):
 
     complex: Mapped[CinemaComplex] = relationship(back_populates="screenings")
     movie: Mapped[Movie] = relationship(back_populates="screenings")
+
+
+class ScrapeRun(Base):
+    """One execution of the scraper, kept so freshness is a query rather than a guess.
+
+    Without this the only record is a launchd log file nobody reads, and questions
+    like "when did this last succeed" have no answer the app itself can give.
+    """
+
+    __tablename__ = "scrape_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    started_at: Mapped[_dt.datetime] = mapped_column(index=True)
+    finished_at: Mapped[_dt.datetime | None] = mapped_column(nullable=True)
+    complexes_succeeded: Mapped[int] = mapped_column(default=0)
+    complexes_failed: Mapped[int] = mapped_column(default=0)
+    failures: Mapped[str] = mapped_column(String, default="")
+
+    @property
+    def succeeded(self) -> bool:
+        return self.finished_at is not None and self.complexes_failed == 0
