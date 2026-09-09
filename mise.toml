@@ -1,6 +1,11 @@
 [tools]
-python = "latest"
-node = "latest"
+# Pinned rather than "latest": the toolchain has to be the same on a laptop and
+# in CI. uv and bun were missing entirely — they only worked locally because
+# mise had them installed globally, so a fresh clone or CI had neither.
+python = "3.14"
+node = "26"
+uv = "0.11"
+bun = "1.3"
 
 [tasks.backend_lint]
 description = "Lint backend"
@@ -12,10 +17,12 @@ dir = "{{cwd}}/backend"
 
 [tasks.frontend_lint]
 description = "Lint frontend"
+# `bun run lint` is read-only (biome check). It used to end with `bun run format`,
+# which is `biome check --write` — so `mise lint` reformatted the working tree and
+# always passed. A check that fixes what it is checking cannot fail in CI.
 run = [
   "bun run lint",
   "bun run typecheck",
-  "bun run format",
 ]
 dir = "{{cwd}}/frontend"
 
