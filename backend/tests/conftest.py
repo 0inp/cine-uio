@@ -14,7 +14,7 @@ from app.models import Screening as ScreeningModel
 
 
 @pytest.fixture
-def db() -> Generator[Session, None, None]:
+def db() -> Generator[Session]:
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -37,10 +37,12 @@ def bare_db(db: Session) -> Session:
     db.add_all([company1, company2])
     db.flush()
 
-    db.add_all([
-        CinemaComplexModel(name="CCI", url_part="/?cityId=19&storeId=3555", company_id=company1.id),
-        CinemaComplexModel(name="San Luis", url_part="/cartelera/quito/san-luis/216", company_id=company2.id),
-    ])
+    db.add_all(
+        [
+            CinemaComplexModel(name="CCI", url_part="/?cityId=19&storeId=3555", company_id=company1.id),
+            CinemaComplexModel(name="San Luis", url_part="/cartelera/quito/san-luis/216", company_id=company2.id),
+        ]
+    )
     db.commit()
     return db
 
@@ -58,21 +60,23 @@ def seeded_db(bare_db: Session) -> Session:
     bare_db.add_all([movie1, movie2])
     bare_db.flush()
 
-    bare_db.add_all([
-        ScreeningModel(
-            datetime=datetime(2026, 6, 25, 14, 30),
-            format="2D",
-            language="Doblada",
-            complex_id=cci_id,
-            movie_id=movie1.id,
-        ),
-        ScreeningModel(
-            datetime=datetime(2026, 6, 25, 20, 0),
-            format="3D",
-            language="Subtitulada",
-            complex_id=san_luis_id,
-            movie_id=movie2.id,
-        ),
-    ])
+    bare_db.add_all(
+        [
+            ScreeningModel(
+                datetime=datetime(2026, 6, 25, 14, 30),
+                format="2D",
+                language="Doblada",
+                complex_id=cci_id,
+                movie_id=movie1.id,
+            ),
+            ScreeningModel(
+                datetime=datetime(2026, 6, 25, 20, 0),
+                format="3D",
+                language="Subtitulada",
+                complex_id=san_luis_id,
+                movie_id=movie2.id,
+            ),
+        ]
+    )
     bare_db.commit()
     return bare_db
