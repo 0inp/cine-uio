@@ -42,8 +42,13 @@ def bare_db(db: Session) -> Session:
 
     db.add_all(
         [
-            CinemaComplexModel(name="CCI", url_part="/?cityId=19&storeId=3555", company_id=company1.id),
-            CinemaComplexModel(name="San Luis", url_part="/cartelera/quito/san-luis/216", company_id=company2.id),
+            CinemaComplexModel(name="CCI", city="Quito", url_part="/?cityId=19&storeId=3555", company_id=company1.id),
+            CinemaComplexModel(
+                name="San Luis",
+                city="Quito",
+                url_part="/cartelera/quito/san-luis/216",
+                company_id=company2.id,
+            ),
         ]
     )
     db.commit()

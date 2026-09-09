@@ -1,6 +1,6 @@
 import datetime as _dt
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -20,9 +20,14 @@ class CinemaCompany(Base):
 
 class CinemaComplex(Base):
     __tablename__ = "cinema_complexes"
+    # Screenings are attributed to a complex by (company, name), so a chain opening a
+    # second venue under an existing name must fail loudly at seed time rather than
+    # silently folding its listings into the other one.
+    __table_args__ = (UniqueConstraint("company_id", "name", name="uq_complex_company_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String)
+    city: Mapped[str] = mapped_column(String, index=True)
     url_part: Mapped[str] = mapped_column(String)
     company_id: Mapped[int] = mapped_column(ForeignKey("cinema_companies.id"))
 

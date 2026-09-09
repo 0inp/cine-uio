@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from app.database import get_all_screenings, get_db  # noqa: E402
+from app.database import get_all_cities, get_all_screenings, get_db  # noqa: E402
 from app.schemas import ScreeningSchema  # noqa: E402
 
 app = FastAPI()
@@ -31,10 +31,16 @@ app.add_middleware(
 def get_screenings(
     cinema_company_name: str | None = Query(None),
     cinema_complex_name: str | None = Query(None),
+    city: str | None = Query(None, description="Restrict to one city; the payload is large without it"),
     db: Session = Depends(get_db),
 ) -> list[ScreeningSchema]:
-    screenings = get_all_screenings(db, cinema_company_name, cinema_complex_name)
+    screenings = get_all_screenings(db, cinema_company_name, cinema_complex_name, city)
     return [ScreeningSchema.model_validate(s) for s in screenings]
+
+
+@app.get("/api/cities", response_model=list[str])
+def get_cities(db: Session = Depends(get_db)) -> list[str]:
+    return get_all_cities(db)
 
 
 def mount_frontend(app: FastAPI, dist_dir: Path) -> bool:

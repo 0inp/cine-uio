@@ -16,6 +16,7 @@ class CinemaComplexSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     name: str
+    city: str
     url_part: str
     company: CinemaCompanySchema
 

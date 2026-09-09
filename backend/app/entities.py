@@ -13,6 +13,7 @@ class CinemaComplex:
     name: str
     url_part: str
     company: CinemaCompany
+    city: str = ""
 
 
 @dataclass
