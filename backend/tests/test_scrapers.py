@@ -1,7 +1,13 @@
 import re
+from datetime import datetime
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
+from app.entities import CinemaCompany, CinemaComplex, Movie, Screening
+from app.scrape import ComplexScrapeResult
+from app.scrapers.base import MAX_COMPLEX_ATTEMPTS, Scraper
 from app.scrapers.multicines import _title_to_slug
 
 # Replicate the sanitizer logic from SupercinesScraper._scrape_complex_page
@@ -66,3 +72,94 @@ class TestSupercinasFormatLanguageSplit:
         fmt, lang = _split_format_language(tecnology)
         assert fmt == expected_format
         assert lang == expected_language
+
+
+class _FakePage:
+    def __init__(self) -> None:
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _FakeBrowser:
+    def __init__(self) -> None:
+        self.pages: list[_FakePage] = []
+
+    def new_page(self) -> _FakePage:
+        page = _FakePage()
+        self.pages.append(page)
+        return page
+
+
+class _FlakyScraper(Scraper):
+    company_name = "Flaky"
+
+    def __init__(self, company: CinemaCompany, failures: int) -> None:
+        super().__init__(company)
+        self.failures = failures
+        self.calls = 0
+
+    def _scrape_complex_page(self, page: Any, complex: CinemaComplex) -> list[Screening]:
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise ConnectionError("Connection reset by peer")
+        return [
+            Screening(
+                datetime=datetime(2026, 9, 9, 20, 0),
+                format="2D",
+                language="Doblada",
+                complex=complex,
+                movie=Movie(title="Some film"),
+            )
+        ]
+
+
+@pytest.fixture
+def flaky_complex() -> CinemaComplex:
+    company = CinemaCompany(name="Flaky", base_url="https://example.com")
+    return CinemaComplex(name="Somewhere", city="Quito", url_part="/x", company=company)
+
+
+class TestComplexRetry:
+    """A reset connection cost 7 of 25 Supercines venues their listings in one run,
+    so a transient failure gets a few attempts before the venue is given up on."""
+
+    def _run(self, failures: int, complex: CinemaComplex) -> tuple[ComplexScrapeResult, _FlakyScraper]:
+        scraper = _FlakyScraper(complex.company, failures)
+        browser = _FakeBrowser()
+        with patch("app.scrapers.base.time.sleep") as sleep:
+            result = scraper._scrape_one_complex(browser, complex)  # type: ignore[arg-type]
+        scraper.slept = sleep.call_count  # type: ignore[attr-defined]
+        scraper.browser = browser  # type: ignore[attr-defined]
+        return result, scraper
+
+    def test_a_first_attempt_success_does_not_retry_or_wait(self, flaky_complex: CinemaComplex) -> None:
+        result, scraper = self._run(0, flaky_complex)
+        assert result.error is None and len(result.screenings) == 1
+        assert scraper.calls == 1
+        assert scraper.slept == 0  # type: ignore[attr-defined]
+
+    def test_recovers_from_a_transient_failure(self, flaky_complex: CinemaComplex) -> None:
+        result, scraper = self._run(1, flaky_complex)
+        assert result.error is None and len(result.screenings) == 1
+        assert scraper.calls == 2
+
+    def test_recovers_on_the_last_allowed_attempt(self, flaky_complex: CinemaComplex) -> None:
+        result, scraper = self._run(MAX_COMPLEX_ATTEMPTS - 1, flaky_complex)
+        assert result.error is None
+        assert scraper.calls == MAX_COMPLEX_ATTEMPTS
+
+    def test_gives_up_and_reports_after_the_last_attempt(self, flaky_complex: CinemaComplex) -> None:
+        result, scraper = self._run(MAX_COMPLEX_ATTEMPTS, flaky_complex)
+        assert result.error == "Connection reset by peer"
+        assert result.screenings == []
+        assert scraper.calls == MAX_COMPLEX_ATTEMPTS
+        # No pause after the final attempt.
+        assert scraper.slept == MAX_COMPLEX_ATTEMPTS - 1  # type: ignore[attr-defined]
+
+    def test_every_attempt_closes_its_page(self, flaky_complex: CinemaComplex) -> None:
+        _, scraper = self._run(MAX_COMPLEX_ATTEMPTS, flaky_complex)
+        pages = scraper.browser.pages  # type: ignore[attr-defined]
+        assert len(pages) == MAX_COMPLEX_ATTEMPTS
+        assert all(p.closed for p in pages)
