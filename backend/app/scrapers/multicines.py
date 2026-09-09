@@ -1,6 +1,5 @@
 # - MulticinesScraper: Scraper for Multicines website.
 import re
-import sys
 import unicodedata
 from datetime import date, datetime, time, timedelta
 from typing import TypedDict
@@ -9,7 +8,6 @@ from urllib.parse import parse_qs, urlparse, urlunparse
 import requests
 from playwright.sync_api import Page
 
-from app.database import save_screenings
 from app.entities import CinemaComplex, Movie, Screening
 from app.logging import logger
 from app.scrapers.base import Scraper
@@ -38,7 +36,7 @@ def _title_to_slug(title: str) -> str:
 class MulticinesScraper(Scraper):
     company_name = "Multicines"
 
-    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
+    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> list[Screening]:
         url = f"{complex.company.base_url}{complex.url_part}"
         logger.info(f"Scraping complex: {url}")
         page.goto(url)
@@ -126,12 +124,7 @@ class MulticinesScraper(Scraper):
 
             screenings.extend(movie_screenings)
 
-        try:
-            save_screenings(self.db, screenings)
-        except Exception as e:
-            logger.error(f"Error saving screenings during scraping: {e}", exc_info=True)
-            sys.exit(1)
-
         logger.info(
             f"{len(movies)} movies have been processed, with a total of {len(screenings)} screenings for {complex.name}"
         )
+        return screenings

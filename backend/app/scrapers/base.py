@@ -5,14 +5,10 @@ from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from playwright.sync_api import Browser, Page, sync_playwright
-from sqlalchemy.orm import Session
 
-from app.database import (
-    SessionLocal,
-    get_all_cinema_complexes_from_cinema_company,
-)
-from app.entities import CinemaCompany, CinemaComplex
+from app.entities import CinemaCompany, CinemaComplex, Screening
 from app.logging import logger
+from app.scrape import ComplexScrapeResult
 
 
 class Scraper(ABC):
@@ -33,31 +29,50 @@ class Scraper(ABC):
 
     def __init__(self, company: CinemaCompany) -> None:
         self.company: CinemaCompany = company
-        self.db: Session = SessionLocal()
 
     @abstractmethod
-    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
-        pass
+    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> list[Screening]:
+        """Return the screenings found for one complex. Raise if the page cannot be read."""
 
-    def run_scrape(self) -> None:
+    def run_scrape(self, complexes: list[CinemaComplex]) -> list[ComplexScrapeResult]:
+        """Scrape each complex and report an outcome for every one of them.
+
+        Scrapers no longer write to the database: they report, and the caller decides
+        what to publish. A complex that fails is recorded as a failure rather than
+        silently skipped, so a lost venue cannot pass for a successful run.
+        """
         logger.info(f"Starting to scrape company: {self.company.name}")
+        results: list[ComplexScrapeResult] = []
 
+        with sync_playwright() as p:
+            browser: Browser = p.chromium.launch(headless=True)
+            try:
+                for complex in complexes:
+                    results.append(self._scrape_one_complex(browser, complex))
+            finally:
+                browser.close()
+
+        return results
+
+    def _scrape_one_complex(self, browser: Browser, complex: CinemaComplex) -> ComplexScrapeResult:
+        page: Page | None = None
         try:
-            with sync_playwright() as p:
-                browser: Browser = p.chromium.launch(headless=True)
-                complexes: list[CinemaComplex] = get_all_cinema_complexes_from_cinema_company(
-                    self.db, self.company.name
-                )
-                try:
-                    for complex in complexes:
-                        page: Page | None = None
-                        try:
-                            page = browser.new_page()
-                            self._scrape_complex_page(page, complex)
-                        finally:
-                            if page is not None:
-                                page.close()
-                finally:
-                    browser.close()
+            page = browser.new_page()
+            screenings = self._scrape_complex_page(page, complex)
+        except Exception as e:
+            logger.error(f"{self.company.name} / {complex.name}: scrape failed: {e}", exc_info=True)
+            return ComplexScrapeResult(
+                company_name=self.company.name,
+                complex_name=complex.name,
+                error=str(e) or type(e).__name__,
+            )
+        else:
+            logger.info(f"{complex.name}: scraped {len(screenings)} screenings")
+            return ComplexScrapeResult(
+                company_name=self.company.name,
+                complex_name=complex.name,
+                screenings=screenings,
+            )
         finally:
-            self.db.close()
+            if page is not None:
+                page.close()

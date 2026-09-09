@@ -10,49 +10,38 @@ from dotenv import load_dotenv
 # TMDB_READ_ACCESS_TOKEN, so the .env has to be loaded before those modules are imported.
 load_dotenv()
 
-from app.database import (  # noqa: E402
-    SessionLocal,
-    delete_all_screenings,
-    enrich_movies_with_tmdb,
-    get_all_cinema_companies,
-)
+from app.database import SessionLocal, enrich_movies_with_tmdb  # noqa: E402
 from app.logging import logger  # noqa: E402
-from app.scrapers.base import Scraper  # noqa: E402
+from app.scrape import apply_scrape_results, run_all_scrapes  # noqa: E402
 
 
 def main() -> None:
     db_session = SessionLocal()
+    failures: list[str] = []
 
     try:
-        delete_all_screenings(db_session)
-        cinema_companies = get_all_cinema_companies(db_session)
+        results = run_all_scrapes(db_session)
+        failures = apply_scrape_results(db_session, results)
     except Exception as e:
-        logger.error(f"Error scraping data: {e}", exc_info=True)
-        sys.exit(1)
-    finally:
+        logger.error(f"Scraping failed: {e}", exc_info=True)
         db_session.close()
+        sys.exit(1)
 
-    logger.info(f"Found {len(cinema_companies)} cinema companies in the database")
-
-    for company in cinema_companies:
-        logger.info(f"Processing company: {company.name}")
-        scraper = Scraper.create(company)
-        scraper.run_scrape()
-
-    db_session = SessionLocal()
-    enrichment_ok = True
     try:
         enrich_movies_with_tmdb(db_session)
     except Exception as e:
-        enrichment_ok = False
+        failures.append(f"TMDB enrichment failed: {e}")
         logger.error(f"TMDB enrichment failed: {e}", exc_info=True)
     finally:
         db_session.close()
 
-    if enrichment_ok:
-        logger.info("Scraping completed successfully!")
-    else:
-        logger.warning("Scraping completed, but TMDB enrichment failed — movies may lack metadata")
+    if failures:
+        # Exit non-zero so a partial run is visible in the launchd log rather than
+        # passing for success, which is how a whole complex was lost unnoticed.
+        logger.error(f"Scrape run completed with {len(failures)} failure(s)")
+        sys.exit(1)
+
+    logger.info("Scraping completed successfully!")
 
 
 if __name__ == "__main__":
