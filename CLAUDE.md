@@ -5,6 +5,7 @@ Movie screening aggregator for Quito, Ecuador — scrapes Multicines and Superci
 ## Key Files
 
 - `docs/CONTEXT.md` — full domain glossary, architecture diagram, data flow, run instructions
+- `docs/hosting.md` — deferred plan for public hosting (Neon + Fly + Cloudflare Pages); production is a laptop for now
 - `backend/app/api.py` — single FastAPI route: `GET /api/screenings`
 - `backend/app/database.py` — all DB query helpers + session management
 - `backend/app/scrapers/` — `base.py` (abstract + registry), `multicines.py`, `supercines.py`
