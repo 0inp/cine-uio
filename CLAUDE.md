@@ -28,7 +28,17 @@ cd frontend && bun dev               # dev server on :5173
 mise lint    # mypy + ruff + biome
 mise format  # ruff format + biome write
 mise test    # pytest + vitest
+
+mise run dev     # API + Vite dev servers (two origins, CORS applies)
+mise run start   # build SPA, serve it + API from :8000 (single origin) — "prod"
+mise run serve   # expose :8000 on the tailnet over HTTPS
+mise run scrape  # refresh screenings + TMDB metadata
 ```
+
+## Production
+
+Production is this laptop, served over Tailscale — see `docs/CONTEXT.md`.
+The daily refresh is a launchd agent: `./ops/install-scrape-agent.sh`.
 
 ## Conventions
 

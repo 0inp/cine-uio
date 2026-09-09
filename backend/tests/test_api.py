@@ -1,10 +1,12 @@
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.api import app
+from app.api import app, mount_frontend
 from app.database import get_db
 
 
@@ -68,3 +70,33 @@ class TestGetScreenings:
     def test_unknown_company_returns_empty_list(self, client: TestClient) -> None:
         data = client.get("/api/screenings", params={"cinema_company_name": "Ghost"}).json()
         assert data == []
+
+
+class TestFrontendMount:
+    """The SPA is served from the same origin as the API, so a Tailscale Serve
+    target is a single port and no CORS configuration is involved."""
+
+    def _dist(self, tmp_path: Path) -> Path:
+        dist = tmp_path / "dist"
+        dist.mkdir()
+        (dist / "index.html").write_text("<html>SPA</html>")
+        return dist
+
+    def test_serves_index_html_at_the_root(self, tmp_path: Path) -> None:
+        app = FastAPI()
+        assert mount_frontend(app, self._dist(tmp_path)) is True
+        assert TestClient(app).get("/").text == "<html>SPA</html>"
+
+    def test_api_routes_still_win_over_the_static_mount(self, tmp_path: Path) -> None:
+        app = FastAPI()
+
+        @app.get("/api/ping")
+        def ping() -> dict[str, bool]:
+            return {"ok": True}
+
+        mount_frontend(app, self._dist(tmp_path))
+        assert TestClient(app).get("/api/ping").json() == {"ok": True}
+
+    def test_does_nothing_without_a_build(self, tmp_path: Path) -> None:
+        # Normal in development: Vite serves the frontend on its own port.
+        assert mount_frontend(FastAPI(), tmp_path) is False
