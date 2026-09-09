@@ -28,6 +28,7 @@ cine-uio/
 │   │   ├── schemas.py      — Pydantic response schemas
 │   │   ├── seed.py         — Seed CinemaCompany + CinemaComplex rows
 │   │   ├── logging.py      — Shared logger
+│   │   ├── scrape.py       — Scrape run orchestration: collect results, publish per complex
 │   │   ├── tmdb.py         — TMDB API client (search + enrichment)
 │   │   └── scrapers/
 │   │       ├── base.py         — Abstract Scraper + registry pattern
@@ -45,7 +46,10 @@ cine-uio/
 ## Data Flow
 
 1. **Seed**: `app/seed.py` populates `CinemaCompany` and `CinemaComplex` rows (must run before scraping).
-2. **Scrape**: `scraper_entrypoint.py` deletes all screenings, iterates over companies, picks the right `Scraper` subclass via registry, scrapes each complex, and saves `Screening` rows.
+2. **Scrape**: `scraper_entrypoint.py` runs every registered `Scraper`, which **returns** the screenings it found per complex rather than writing them. `scrape.apply_scrape_results` then swaps each complex's screenings in its own transaction.
+   - A reader never sees an empty cartelera: the delete and the inserts for a complex commit together, so a request during a scrape sees either the previous listing or the new one.
+   - A complex that fails — or that scrapes zero screenings, which is indistinguishable from a broken scrape — keeps its previous screenings instead of being wiped. The other complexes still refresh.
+   - The run exits non-zero when anything failed, so a partial scrape is visible in the launchd log rather than passing for success.
 3. **Enrich**: After all scrapers finish, `database.enrich_movies_with_tmdb` looks up each un-enriched `Movie` on TMDB, stores canonical metadata (title, poster, overview, runtime, certification), and merges any duplicate `Movie` rows that resolved to the same `tmdb_id`. Progress is committed per movie, so a crash mid-run keeps the API work already done.
 4. **Serve**: `main.py` / `app/api.py` exposes `GET /api/screenings` (with optional `cinema_company_name` and `cinema_complex_name` filters).
 5. **Display**: Frontend fetches all screenings, filters to today's date (Ecuador TZ), groups by `tmdb_id` (falling back to scraped title), displays the canonical `tmdb_title`, and renders poster, runtime, certification, and overview alongside showtimes. When today has no screenings, it falls back to the nearest *upcoming* date — never a past one — and shows an empty state if nothing is upcoming.
@@ -152,7 +156,7 @@ mise test     # pytest (backend) + vitest (frontend)
 
 - SQLite is the database — single-file, no concurrency concerns at this scale. Connections are put in **WAL** journal mode with a 5s `busy_timeout` (`database.configure_sqlite`): the daily scrape rewrites every screening while the API may be serving, and SQLite's default `delete` mode has a writer block readers outright.
 - Scraping uses Playwright to load pages and capture XHR requests; API tokens/headers are harvested from the browser session.
-- `delete_all_screenings` is called at the start of every scrape run (full refresh, no incremental update). `Movie` rows are **not** deleted between runs, so TMDB metadata persists and only new movies need enrichment.
+- Screenings are replaced per complex, not globally. `Movie` rows are **not** deleted between runs, so TMDB metadata persists and only new movies need enrichment.
 - The Supercines scraper parses embedded Next.js `__next_f.push` data; this is fragile to site changes.
 - TMDB enrichment requires `TMDB_READ_ACCESS_TOKEN` to be set. If missing, enrichment is silently skipped (movies remain without TMDB data).
 - TMDB search issues **one** request per title variant. Retrying the same query in other languages was tried and removed: TMDB's index spans alternative and translated titles, so English titles resolve fine under `es-LA`. The `language` parameter is still kept because it reorders results for ambiguous titles, and only the top hit is used.

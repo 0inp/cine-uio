@@ -169,46 +169,74 @@ def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_nam
     ]
 
 
-def save_screenings(db: Session, screenings: list[Screening]) -> None:
-    existing_movies_result = db.execute(select(MovieModel))
-    existing_movies: dict[str, int] = {movie.title: movie.id for movie in existing_movies_result.scalars().all()}
+def _complex_ids_by_company_and_name(db: Session) -> dict[tuple[str, str], int]:
+    """Complex ids keyed by (company name, complex name).
 
-    existing_complexes_result = db.execute(select(CinemaComplexModel))
-    existing_complexes: dict[str, int] = {
-        complex.name: complex.id for complex in existing_complexes_result.scalars().all()
-    }
+    Keyed on the pair, not the complex name alone: two chains can bill a complex
+    with the same name, and a name-only lookup would silently attribute one's
+    screenings to the other.
+    """
+    rows = db.execute(
+        select(CinemaCompanyModel.name, CinemaComplexModel.name, CinemaComplexModel.id).join(CinemaComplexModel.company)
+    ).all()
+    return {(company_name, complex_name): complex_id for company_name, complex_name, complex_id in rows}
+
+
+def _insert_screenings(db: Session, screenings: list[Screening]) -> None:
+    """Add screenings to the session without committing, creating movies as needed."""
+    movie_ids: dict[str, int] = {movie.title: movie.id for movie in db.execute(select(MovieModel)).scalars().all()}
+    complex_ids = _complex_ids_by_company_and_name(db)
 
     for screening in screenings:
-        if screening.movie.title not in existing_movies:
-            new_movie = MovieModel(title=screening.movie.title)
+        title = screening.movie.title
+        if title not in movie_ids:
+            new_movie = MovieModel(title=title)
             db.add(new_movie)
             db.flush()
-            db.refresh(new_movie)
-            existing_movies[screening.movie.title] = new_movie.id
+            movie_ids[title] = new_movie.id
 
-        movie_model_id = existing_movies[screening.movie.title]
+        company_name = screening.complex.company.name
+        complex_key = (company_name, screening.complex.name)
+        if complex_key not in complex_ids:
+            raise ValueError(f"Complex {screening.complex.name} with company {company_name} not found in the database.")
 
-        if screening.complex.name not in existing_complexes:
-            raise ValueError(
-                f"Complex {screening.complex.name} with company {screening.complex.company.name} not found in the database."
+        db.add(
+            ScreeningModel(
+                datetime=screening.datetime,
+                format=screening.format,
+                language=screening.language,
+                complex_id=complex_ids[complex_key],
+                movie_id=movie_ids[title],
             )
-        complex_model_id = existing_complexes[screening.complex.name]
-
-        screening_model = ScreeningModel(
-            datetime=screening.datetime,
-            format=screening.format,
-            language=screening.language,
-            complex_id=complex_model_id,
-            movie_id=movie_model_id,
         )
-        db.add(screening_model)
 
+
+def save_screenings(db: Session, screenings: list[Screening]) -> None:
+    _insert_screenings(db, screenings)
     db.commit()
 
 
-def delete_all_screenings(db: Session) -> None:
-    db.execute(delete(ScreeningModel))
-    db.commit()
+def replace_screenings_for_complex(
+    db: Session, company_name: str, complex_name: str, screenings: list[Screening]
+) -> None:
+    """Swap one complex's screenings in a single transaction.
+
+    The delete and the inserts commit together, so a request arriving mid-scrape sees
+    either the previous cartelera or the new one, never an empty one. Scoped to a
+    single complex so that a chain or a venue failing to scrape leaves the others —
+    and its own previous screenings — untouched.
+    """
+    complex_id = _complex_ids_by_company_and_name(db).get((company_name, complex_name))
+    if complex_id is None:
+        raise ValueError(f"Complex {complex_name} with company {company_name} not found in the database.")
+
+    try:
+        db.execute(delete(ScreeningModel).where(ScreeningModel.complex_id == complex_id))
+        _insert_screenings(db, screenings)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def enrich_movies_with_tmdb(db: Session) -> None:

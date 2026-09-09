@@ -9,14 +9,16 @@ from sqlalchemy.orm import Session
 from app.database import (
     MAX_TMDB_ATTEMPTS,
     configure_sqlite,
-    delete_all_screenings,
     enrich_movies_with_tmdb,
     get_all_cinema_companies,
     get_all_cinema_complexes_from_cinema_company,
     get_all_screenings,
+    replace_screenings_for_complex,
     save_screenings,
 )
 from app.entities import CinemaCompany, CinemaComplex, Movie, Screening
+from app.models import CinemaCompany as CinemaCompanyModel
+from app.models import CinemaComplex as CinemaComplexModel
 from app.models import Movie as MovieModel
 from app.tmdb import TMDBMovie
 
@@ -226,6 +228,60 @@ class TestTmdbAttemptPolicy:
         assert enriched.tmdb_id == 862
 
 
+class TestReplaceScreeningsForComplex:
+    """The daily scrape swaps each complex in one transaction, so a reader during a
+    scrape sees either the previous cartelera or the new one — never an empty one."""
+
+    def test_replaces_only_the_targeted_complex(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Old CCI", "CCI", "Multicines")])
+        save_screenings(bare_db, [_make_screening("Old San Luis", "San Luis", "Supercines")])
+
+        replace_screenings_for_complex(bare_db, "Multicines", "CCI", [_make_screening("New CCI", "CCI", "Multicines")])
+
+        titles = {s.movie.title for s in get_all_screenings(bare_db)}
+        assert titles == {"New CCI", "Old San Luis"}
+
+    def test_replacing_with_nothing_empties_only_that_complex(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Old CCI", "CCI", "Multicines")])
+        save_screenings(bare_db, [_make_screening("Old San Luis", "San Luis", "Supercines")])
+
+        replace_screenings_for_complex(bare_db, "Multicines", "CCI", [])
+
+        titles = {s.movie.title for s in get_all_screenings(bare_db)}
+        assert titles == {"Old San Luis"}
+
+    def test_a_failed_insert_leaves_the_previous_screenings_intact(self, bare_db: Session) -> None:
+        # Atomicity: if the swap cannot complete, nothing is published and the reader
+        # keeps seeing what was there before.
+        save_screenings(bare_db, [_make_screening("Old CCI", "CCI", "Multicines")])
+        doomed = [_make_screening("New CCI", "Nowhere", "Multicines")]
+
+        with pytest.raises(ValueError):
+            replace_screenings_for_complex(bare_db, "Multicines", "CCI", doomed)
+
+        assert [s.movie.title for s in get_all_screenings(bare_db)] == ["Old CCI"]
+
+    def test_complexes_sharing_a_name_across_companies_stay_separate(self, bare_db: Session) -> None:
+        # "CCI" already exists under Multicines; give Supercines one too.
+        supercines_id = bare_db.execute(
+            select(CinemaCompanyModel.id).where(CinemaCompanyModel.name == "Supercines")
+        ).scalar_one()
+        bare_db.add(CinemaComplexModel(name="CCI", url_part="/other", company_id=supercines_id))
+        bare_db.commit()
+
+        save_screenings(bare_db, [_make_screening("Multicines film", "CCI", "Multicines")])
+        replace_screenings_for_complex(
+            bare_db, "Supercines", "CCI", [_make_screening("Supercines film", "CCI", "Supercines")]
+        )
+
+        by_company = {(s.complex.company.name, s.movie.title) for s in get_all_screenings(bare_db)}
+        assert by_company == {("Multicines", "Multicines film"), ("Supercines", "Supercines film")}
+
+    def test_unknown_complex_is_rejected(self, bare_db: Session) -> None:
+        with pytest.raises(ValueError, match="Ghost"):
+            replace_screenings_for_complex(bare_db, "Multicines", "Ghost", [])
+
+
 class TestSqliteConfiguration:
     def test_connections_use_wal_journal_mode(self, tmp_path: Path) -> None:
         # The daily scrape rewrites every screening while the API may be serving
@@ -240,13 +296,6 @@ class TestSqliteConfiguration:
         configure_sqlite(engine)
         with engine.connect() as conn:
             assert conn.exec_driver_sql("PRAGMA busy_timeout").scalar_one() > 0
-
-
-class TestDeleteAllScreenings:
-    def test_removes_every_screening(self, seeded_db: Session) -> None:
-        assert len(get_all_screenings(seeded_db)) > 0
-        delete_all_screenings(seeded_db)
-        assert get_all_screenings(seeded_db) == []
 
 
 class TestGetAllCinemaCompanies:

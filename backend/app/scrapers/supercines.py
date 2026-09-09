@@ -1,13 +1,11 @@
 # - SupercinesScraper: Scraper for Supercines website.
 import json
 import re
-import sys
 from datetime import date, datetime, timedelta
 
 import requests
 from playwright.sync_api import ElementHandle, Page
 
-from app.database import save_screenings
 from app.entities import CinemaComplex, Movie, Screening
 from app.logging import logger
 from app.scrapers.base import Scraper
@@ -16,7 +14,7 @@ from app.scrapers.base import Scraper
 class SupercinesScraper(Scraper):
     company_name = "Supercines"
 
-    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> None:
+    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> list[Screening]:
         url = f"{complex.company.base_url}{complex.url_part}"
         logger.info(f"Scraping complex: {url}")
         page.goto(url, wait_until="networkidle")
@@ -32,8 +30,9 @@ class SupercinesScraper(Scraper):
                 break
 
         if not script_content:
-            logger.warning("No script content found containing 'self.__next_f.push' and 'initialData'")
-            return
+            # Raise rather than return nothing: an unreadable page is a failed scrape,
+            # and reporting it keeps this complex's previous screenings published.
+            raise ValueError("no script tag containing 'self.__next_f.push' and 'initialData'")
 
         sanitized_script_content: str = (
             re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), script_content)
@@ -47,8 +46,7 @@ class SupercinesScraper(Scraper):
             )
 
             if not json_match:
-                logger.debug("No initialData array found in script")
-                return
+                raise ValueError("no initialData array found in the page script")
 
             # Clean and parse the JSON
             json_str: str = "{" + json_match.group(1) + "}"
@@ -126,19 +124,12 @@ class SupercinesScraper(Scraper):
                 screenings.extend(movie_screenings)
 
         except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error: {e}")
+            # Let it propagate: run_scrape records the complex as failed, and its
+            # previous screenings stay published rather than being wiped.
             logger.debug(f"Failed to parse JSON: {json_str[:200]}...")  # Log first 200 chars for debugging
-            return
-        except Exception as e:
-            logger.error(f"Unexpected error during scraping: {e}")
-            return
-
-        try:
-            save_screenings(self.db, screenings)
-        except Exception as e:
-            logger.error(f"Error saving screenings during scraping: {e}", exc_info=True)
-            sys.exit(1)
+            raise ValueError(f"could not parse the embedded Next.js payload: {e}") from e
 
         logger.info(
             f"{len(movies)} movies have been processed, with a total of {len(screenings)} screenings for {complex.name}"
         )
+        return screenings
