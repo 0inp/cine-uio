@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import App, { ScreeningItem } from "./App";
+import App from "./App";
+import { ScreeningItem } from "./components/ScreeningItem";
 
 // Compute today/tomorrow in Ecuador time so tests stay date-independent.
 function ecuadorDate(offsetDays = 0): string {
