@@ -96,31 +96,36 @@ function App() {
     fetchScreenings();
   }, []);
 
-  const { displayDate, todaysScreenings } = useMemo(() => {
+  const { displayDate, visibleScreenings } = useMemo(() => {
     if (!screenings || screenings.length === 0)
-      return { displayDate: null, todaysScreenings: [] };
+      return { displayDate: null, visibleScreenings: [] };
     const todayEcuador = new Date().toLocaleDateString("en-CA", {
       timeZone: "America/Guayaquil",
     });
-    const forToday = screenings.filter(
-      (s) => s.datetime.split("T")[0] === todayEcuador,
-    );
+    const onDate = (date: string) =>
+      screenings.filter((s) => s.datetime.split("T")[0] === date);
+
+    const forToday = onDate(todayEcuador);
     if (forToday.length > 0)
-      return { displayDate: null, todaysScreenings: forToday };
-    // No screenings for today (e.g. scraped in the evening after shows ended).
-    // Fall back to the earliest available date.
-    const earliest = screenings.map((s) => s.datetime.split("T")[0]).sort()[0];
-    return {
-      displayDate: earliest,
-      todaysScreenings: screenings.filter(
-        (s) => s.datetime.split("T")[0] === earliest,
-      ),
-    };
+      return { displayDate: null, visibleScreenings: forToday };
+
+    // No screenings today (e.g. scraped in the evening after shows ended).
+    // Fall back to the nearest *upcoming* date — never a past one, which would
+    // happen whenever the scraper hasn't run in a while and the DB is stale.
+    // ISO date strings sort chronologically, so a plain sort is enough.
+    const upcoming = screenings
+      .map((s) => s.datetime.split("T")[0])
+      .filter((date) => date > todayEcuador)
+      .sort();
+    const earliest = upcoming[0];
+    if (!earliest) return { displayDate: null, visibleScreenings: [] };
+
+    return { displayDate: earliest, visibleScreenings: onDate(earliest) };
   }, [screenings]);
 
   const groupedData = useMemo(() => {
     const result = new Map<string, MovieGroup>();
-    for (const screening of todaysScreenings) {
+    for (const screening of visibleScreenings) {
       const key = movieKey(screening.movie);
       const venueKey = `${screening.complex.company.name} - ${screening.complex.name}`;
       let group = result.get(key);
@@ -133,7 +138,7 @@ function App() {
       venue[venueKey].push(screening);
     }
     return result;
-  }, [todaysScreenings]);
+  }, [visibleScreenings]);
 
   const sortedGroups = useMemo(
     () =>
@@ -159,6 +164,9 @@ function App() {
             month: "long",
           })}
         </p>
+      )}
+      {sortedGroups.length === 0 && (
+        <p className="empty-notice">No hay funciones disponibles</p>
       )}
       {sortedGroups.map((group) => {
         const key = movieKey(group.movie);
