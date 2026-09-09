@@ -9,6 +9,7 @@ interface CinemaCompany {
 
 interface CinemaComplex {
   name: string;
+  city: string;
   url_part: string;
   company: CinemaCompany;
 }
@@ -67,15 +68,49 @@ function displayTitle(movie: Movie): string {
   return movie.tmdb_title ?? movie.title;
 }
 
+const DEFAULT_CITY = "Quito";
+const CITY_STORAGE_KEY = "cine-uio.city";
+
+function storedCity(): string {
+  try {
+    return localStorage.getItem(CITY_STORAGE_KEY) ?? DEFAULT_CITY;
+  } catch {
+    return DEFAULT_CITY;
+  }
+}
+
 function App() {
   const [screenings, setScreenings] = useState<Screening[] | null>(null);
+  const [cities, setCities] = useState<string[]>([]);
+  const [city, setCity] = useState<string>(storedCity);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchScreenings = async () => {
+    const fetchCities = async () => {
       try {
-        const response = await fetch(`${apiConfig.url}/screenings`);
+        const response = await fetch(`${apiConfig.url}/cities`);
+        if (!response.ok) return;
+        const result = await response.json();
+        if (Array.isArray(result)) setCities(result);
+      } catch {
+        // The city picker is a convenience; failing to list them must not stop
+        // the listings from rendering for the currently selected city.
+      }
+    };
+    fetchCities();
+  }, []);
+
+  useEffect(() => {
+    // Fetch one city at a time: the whole country is tens of thousands of
+    // screenings, far too large a payload to filter client-side.
+    const fetchScreenings = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `${apiConfig.url}/screenings?city=${encodeURIComponent(city)}`,
+        );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -94,7 +129,16 @@ function App() {
     };
 
     fetchScreenings();
-  }, []);
+  }, [city]);
+
+  const selectCity = (next: string) => {
+    setCity(next);
+    try {
+      localStorage.setItem(CITY_STORAGE_KEY, next);
+    } catch {
+      // Private browsing: the choice simply does not persist.
+    }
+  };
 
   const { displayDate, visibleScreenings } = useMemo(() => {
     if (!screenings || screenings.length === 0)
@@ -155,6 +199,22 @@ function App() {
   return (
     <div className="app">
       <h1 className="title">Cine UIO</h1>
+      {cities.length > 1 && (
+        <div className="city-picker">
+          <label htmlFor="city">Ciudad</label>
+          <select
+            id="city"
+            value={city}
+            onChange={(e) => selectCity(e.target.value)}
+          >
+            {cities.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {displayDate && (
         <p className="date-notice">
           Sin funciones para hoy —{" "}

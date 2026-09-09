@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import (
@@ -12,6 +13,7 @@ from app.database import (
     enrich_movies_with_tmdb,
     get_all_cinema_companies,
     get_all_cinema_complexes_from_cinema_company,
+    get_all_cities,
     get_all_screenings,
     replace_screenings_for_complex,
     save_screenings,
@@ -266,7 +268,7 @@ class TestReplaceScreeningsForComplex:
         supercines_id = bare_db.execute(
             select(CinemaCompanyModel.id).where(CinemaCompanyModel.name == "Supercines")
         ).scalar_one()
-        bare_db.add(CinemaComplexModel(name="CCI", url_part="/other", company_id=supercines_id))
+        bare_db.add(CinemaComplexModel(name="CCI", city="Quito", url_part="/other", company_id=supercines_id))
         bare_db.commit()
 
         save_screenings(bare_db, [_make_screening("Multicines film", "CCI", "Multicines")])
@@ -280,6 +282,50 @@ class TestReplaceScreeningsForComplex:
     def test_unknown_complex_is_rejected(self, bare_db: Session) -> None:
         with pytest.raises(ValueError, match="Ghost"):
             replace_screenings_for_complex(bare_db, "Multicines", "Ghost", [])
+
+
+class TestCityFiltering:
+    def _add_guayaquil_complex(self, db: Session) -> None:
+        company_id = db.execute(
+            select(CinemaCompanyModel.id).where(CinemaCompanyModel.name == "Multicines")
+        ).scalar_one()
+        db.add(CinemaComplexModel(name="Mall Del Sol", city="Guayaquil", url_part="/gye", company_id=company_id))
+        db.commit()
+
+    def test_lists_the_cities_that_have_a_complex(self, bare_db: Session) -> None:
+        self._add_guayaquil_complex(bare_db)
+        assert get_all_cities(bare_db) == ["Guayaquil", "Quito"]
+
+    def test_screenings_can_be_restricted_to_one_city(self, bare_db: Session) -> None:
+        self._add_guayaquil_complex(bare_db)
+        save_screenings(bare_db, [_make_screening("Quito film", "CCI", "Multicines")])
+        save_screenings(bare_db, [_make_screening("Coastal film", "Mall Del Sol", "Multicines")])
+
+        titles = [s.movie.title for s in get_all_screenings(bare_db, city="Guayaquil")]
+        assert titles == ["Coastal film"]
+
+    def test_no_city_filter_returns_every_city(self, bare_db: Session) -> None:
+        self._add_guayaquil_complex(bare_db)
+        save_screenings(bare_db, [_make_screening("Quito film", "CCI", "Multicines")])
+        save_screenings(bare_db, [_make_screening("Coastal film", "Mall Del Sol", "Multicines")])
+        assert len(get_all_screenings(bare_db)) == 2
+
+    def test_unknown_city_returns_nothing(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Quito film", "CCI", "Multicines")])
+        assert get_all_screenings(bare_db, city="Atlantis") == []
+
+
+class TestComplexNameUniqueness:
+    def test_a_chain_cannot_have_two_complexes_with_the_same_name(self, bare_db: Session) -> None:
+        # Screenings are attributed by (company, name), so a duplicate would silently
+        # fold one venue's listings into the other. It must fail at insert instead.
+        multicines_id = bare_db.execute(
+            select(CinemaCompanyModel.id).where(CinemaCompanyModel.name == "Multicines")
+        ).scalar_one()
+        bare_db.add(CinemaComplexModel(name="CCI", city="Guayaquil", url_part="/dup", company_id=multicines_id))
+        with pytest.raises(IntegrityError):
+            bare_db.commit()
+        bare_db.rollback()
 
 
 class TestSqliteConfiguration:

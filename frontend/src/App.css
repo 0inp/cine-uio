@@ -45,6 +45,25 @@
   gap: 20px;
 }
 
+.city-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: -8px 0 20px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.city-picker select {
+  background: var(--social-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 0.9rem;
+}
+
 .date-notice {
   text-align: center;
   color: var(--text);

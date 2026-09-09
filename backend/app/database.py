@@ -67,10 +67,17 @@ def get_db() -> Generator[Session]:
         db.close()
 
 
+def get_all_cities(db: Session) -> list[str]:
+    """Distinct cities that have at least one complex, alphabetically."""
+    rows = db.execute(select(CinemaComplexModel.city).distinct().order_by(CinemaComplexModel.city)).scalars().all()
+    return [city for city in rows if city]
+
+
 def get_all_screenings(
     db: Session,
     cinema_company_name: str | None = None,
     cinema_complex_name: str | None = None,
+    city: str | None = None,
 ) -> list[Screening]:
     query = (
         select(ScreeningModel)
@@ -81,8 +88,11 @@ def get_all_screenings(
         .order_by(ScreeningModel.datetime)
     )
 
-    if cinema_company_name or cinema_complex_name:
+    if cinema_company_name or cinema_complex_name or city:
         query = query.join(ScreeningModel.complex)
+
+    if city:
+        query = query.where(CinemaComplexModel.city == city)
 
     if cinema_company_name:
         query = query.join(CinemaComplexModel.company).where(CinemaCompanyModel.name == cinema_company_name)
@@ -119,6 +129,7 @@ def get_all_screenings(
         if s.complex.id not in complexes:
             complexes[s.complex.id] = CinemaComplex(
                 name=s.complex.name,
+                city=s.complex.city,
                 url_part=s.complex.url_part,
                 company=companies[s.complex.company.id],
             )
@@ -159,6 +170,7 @@ def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_nam
     return [
         CinemaComplex(
             name=orm_complex.name,
+            city=orm_complex.city,
             url_part=orm_complex.url_part,
             company=CinemaCompany(
                 name=orm_complex.company.name,

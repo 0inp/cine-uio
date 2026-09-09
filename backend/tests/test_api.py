@@ -57,6 +57,17 @@ class TestGetScreenings:
         assert movie["tmdb_title"] is None
         assert movie["poster_url"] is None
 
+    def test_complex_exposes_its_city(self, client: TestClient) -> None:
+        complex_ = client.get("/api/screenings").json()[0]["complex"]
+        assert complex_["city"] == "Quito"
+
+    def test_lists_cities(self, client: TestClient) -> None:
+        assert client.get("/api/cities").json() == ["Quito"]
+
+    def test_filter_by_city(self, client: TestClient) -> None:
+        assert len(client.get("/api/screenings", params={"city": "Quito"}).json()) == 2
+        assert client.get("/api/screenings", params={"city": "Guayaquil"}).json() == []
+
     def test_filter_by_company_name(self, client: TestClient) -> None:
         data = client.get("/api/screenings", params={"cinema_company_name": "Multicines"}).json()
         assert len(data) == 1

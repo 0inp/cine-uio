@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App, { ScreeningItem } from "./App";
 
 // Compute today/tomorrow in Ecuador time so tests stay date-independent.
@@ -13,6 +13,7 @@ const tomorrow = ecuadorDate(1);
 
 const BASE_COMPLEX = {
   name: "CCI",
+  city: "Quito",
   url_part: "/?cityId=19&storeId=3555",
   company: { name: "Multicines", base_url: "https://www.multicines.com.ec" },
 };
@@ -26,16 +27,50 @@ const BASE_SCREENING = {
   movie: { title: "Toy Story 5" },
 };
 
-function mockFetch(screenings: unknown[], ok = true): void {
+// The app makes two calls: the city list, then that city's screenings. Route by
+// URL rather than by call order, so a test does not depend on which fires first.
+function mockFetch(
+  screenings: unknown[],
+  ok = true,
+  cities: string[] = ["Quito"],
+): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValueOnce({
-      ok,
-      status: ok ? 200 : 500,
-      json: async () => screenings,
+    vi.fn(async (url: string) => {
+      if (url.includes("/cities")) {
+        return { ok: true, status: 200, json: async () => cities };
+      }
+      return { ok, status: ok ? 200 : 500, json: async () => screenings };
     }),
   );
 }
+
+// This runtime does not provide localStorage, and the app treats it as optional
+// anyway (private browsing). Stub an in-memory one so the persistence of the city
+// choice is actually exercised rather than silently skipped.
+function memoryStorage(): Storage {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (k) => store[k] ?? null,
+    setItem: (k, v) => {
+      store[k] = String(v);
+    },
+    removeItem: (k) => {
+      delete store[k];
+    },
+    clear: () => {
+      store = {};
+    },
+    key: (i) => Object.keys(store)[i] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
+  } as Storage;
+}
+
+beforeEach(() => {
+  vi.stubGlobal("localStorage", memoryStorage());
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -320,5 +355,75 @@ describe("date fallback when there are no screenings today", () => {
     expect(
       screen.queryByText(/Sin funciones para hoy/),
     ).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("city selection", () => {
+  it("requests only the selected city's screenings", async () => {
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    const calls = (
+      globalThis.fetch as unknown as { mock: { calls: string[][] } }
+    ).mock.calls.map((c) => c[0]);
+    expect(calls.some((u) => u.includes("city=Quito"))).toBe(true);
+  });
+
+  it("hides the picker when only one city exists", async () => {
+    mockFetch([BASE_SCREENING], true, ["Quito"]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByLabelText("Ciudad")).not.toBeInTheDocument();
+  });
+
+  it("offers every city when there are several", async () => {
+    mockFetch([BASE_SCREENING], true, ["Cuenca", "Guayaquil", "Quito"]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Ciudad")).toBeInTheDocument(),
+    );
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Cuenca",
+      "Guayaquil",
+      "Quito",
+    ]);
+  });
+
+  it("refetches and remembers the city when it changes", async () => {
+    mockFetch([BASE_SCREENING], true, ["Guayaquil", "Quito"]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Ciudad")).toBeInTheDocument(),
+    );
+
+    fireEvent.change(screen.getByLabelText("Ciudad"), {
+      target: { value: "Guayaquil" },
+    });
+
+    await waitFor(() => {
+      const calls = (
+        globalThis.fetch as unknown as { mock: { calls: string[][] } }
+      ).mock.calls.map((c) => c[0]);
+      expect(calls.some((u) => u.includes("city=Guayaquil"))).toBe(true);
+    });
+    expect(localStorage.getItem("cine-uio.city")).toBe("Guayaquil");
+  });
+
+  it("starts from the remembered city", async () => {
+    localStorage.setItem("cine-uio.city", "Cuenca");
+    mockFetch([], true, ["Cuenca", "Quito"]);
+    render(<App />);
+    await waitFor(() => {
+      const calls = (
+        globalThis.fetch as unknown as { mock: { calls: string[][] } }
+      ).mock.calls.map((c) => c[0]);
+      expect(calls.some((u) => u.includes("city=Cuenca"))).toBe(true);
+    });
   });
 });
