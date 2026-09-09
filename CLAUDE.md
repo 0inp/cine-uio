@@ -5,7 +5,6 @@ Movie screening aggregator for Quito, Ecuador — scrapes Multicines and Superci
 ## Key Files
 
 - `docs/CONTEXT.md` — full domain glossary, architecture diagram, data flow, run instructions
-- `ARCHITECTURE_PLAN.md` — backlog of planned improvements (service layer extraction, hooks, components)
 - `backend/app/api.py` — single FastAPI route: `GET /api/screenings`
 - `backend/app/database.py` — all DB query helpers + session management
 - `backend/app/scrapers/` — `base.py` (abstract + registry), `multicines.py`, `supercines.py`
@@ -39,7 +38,8 @@ mise test    # pytest + vitest
 
 ## Environment Variables
 
-| Variable          | Default                     | Where         |
-|-------------------|-----------------------------|---------------|
-| `VITE_API_URL`    | `http://localhost:8000/api` | frontend      |
-| `ALLOWED_ORIGINS` | `http://localhost:5173`     | backend CORS  |
+| Variable                 | Default                     | Where                       |
+|--------------------------|-----------------------------|-----------------------------|
+| `VITE_API_URL`           | `http://localhost:8000/api` | frontend                    |
+| `ALLOWED_ORIGINS`        | `http://localhost:5173`     | backend CORS                |
+| `TMDB_READ_ACCESS_TOKEN` | *(required)*                | backend — TMDB Bearer token |

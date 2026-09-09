@@ -15,6 +15,13 @@ interface CinemaComplex {
 
 interface Movie {
   title: string;
+  tmdb_id?: number | null;
+  tmdb_title?: string | null;
+  poster_url?: string | null;
+  overview?: string | null;
+  runtime?: number | null;
+  certification?: string | null;
+  release_date?: string | null;
 }
 
 interface Screening {
@@ -43,6 +50,21 @@ export function ScreeningItem({ screening }: ScreeningItemProps) {
       <span className="screening-language">{screening.language}</span>
     </div>
   );
+}
+
+interface MovieGroup {
+  movie: Movie;
+  screeningsByVenue: Record<string, Screening[]>;
+}
+
+function movieKey(movie: Movie): string {
+  return movie.tmdb_id != null
+    ? `tmdb-${movie.tmdb_id}`
+    : `title-${movie.title}`;
+}
+
+function displayTitle(movie: Movie): string {
+  return movie.tmdb_title ?? movie.title;
 }
 
 function App() {
@@ -74,33 +96,50 @@ function App() {
     fetchScreenings();
   }, []);
 
-  const todaysScreenings = useMemo(() => {
-    if (!screenings) return [];
+  const { displayDate, todaysScreenings } = useMemo(() => {
+    if (!screenings || screenings.length === 0)
+      return { displayDate: null, todaysScreenings: [] };
     const todayEcuador = new Date().toLocaleDateString("en-CA", {
       timeZone: "America/Guayaquil",
     });
-    return screenings.filter((s) => s.datetime.split("T")[0] === todayEcuador);
+    const forToday = screenings.filter(
+      (s) => s.datetime.split("T")[0] === todayEcuador,
+    );
+    if (forToday.length > 0)
+      return { displayDate: null, todaysScreenings: forToday };
+    // No screenings for today (e.g. scraped in the evening after shows ended).
+    // Fall back to the earliest available date.
+    const earliest = screenings.map((s) => s.datetime.split("T")[0]).sort()[0];
+    return {
+      displayDate: earliest,
+      todaysScreenings: screenings.filter(
+        (s) => s.datetime.split("T")[0] === earliest,
+      ),
+    };
   }, [screenings]);
 
-  const groupedData = useMemo(
-    () =>
-      todaysScreenings.reduce(
-        (acc, screening) => {
-          const movieTitle = screening.movie.title;
-          const companyComplexKey = `${screening.complex.company.name} - ${screening.complex.name}`;
-          if (!acc[movieTitle]) acc[movieTitle] = {};
-          if (!acc[movieTitle][companyComplexKey])
-            acc[movieTitle][companyComplexKey] = [];
-          acc[movieTitle][companyComplexKey].push(screening);
-          return acc;
-        },
-        {} as Record<string, Record<string, Screening[]>>,
-      ),
-    [todaysScreenings],
-  );
+  const groupedData = useMemo(() => {
+    const result = new Map<string, MovieGroup>();
+    for (const screening of todaysScreenings) {
+      const key = movieKey(screening.movie);
+      const venueKey = `${screening.complex.company.name} - ${screening.complex.name}`;
+      let group = result.get(key);
+      if (!group) {
+        group = { movie: screening.movie, screeningsByVenue: {} };
+        result.set(key, group);
+      }
+      const venue = group.screeningsByVenue;
+      if (!venue[venueKey]) venue[venueKey] = [];
+      venue[venueKey].push(screening);
+    }
+    return result;
+  }, [todaysScreenings]);
 
-  const sortedMovieTitles = useMemo(
-    () => Object.keys(groupedData).sort((a, b) => a.localeCompare(b)),
+  const sortedGroups = useMemo(
+    () =>
+      Array.from(groupedData.values()).sort((a, b) =>
+        displayTitle(a.movie).localeCompare(displayTitle(b.movie)),
+      ),
     [groupedData],
   );
 
@@ -111,26 +150,70 @@ function App() {
   return (
     <div className="app">
       <h1 className="title">Cine UIO</h1>
-      {sortedMovieTitles.map((movieTitle) => (
-        <div key={movieTitle} className="movie-card">
-          <h3 className="movie-title">{movieTitle}</h3>
-          {Object.entries(groupedData[movieTitle]).map(
-            ([companyComplexKey, slotScreenings]) => (
-              <div
-                key={`${movieTitle}-${companyComplexKey}`}
-                className="company-complex-section"
-              >
-                <h4 className="company-complex-name">{companyComplexKey}</h4>
-                <div className="screenings-list">
-                  {slotScreenings.map((s) => (
-                    <ScreeningItem key={s.id} screening={s} />
-                  ))}
+      {displayDate && (
+        <p className="date-notice">
+          Sin funciones para hoy —{" "}
+          {new Date(`${displayDate}T12:00:00`).toLocaleDateString("es-EC", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          })}
+        </p>
+      )}
+      {sortedGroups.map((group) => {
+        const key = movieKey(group.movie);
+        const title = displayTitle(group.movie);
+        const releaseYear = group.movie.release_date?.slice(0, 4);
+
+        return (
+          <div key={key} className="movie-card">
+            <div className="movie-header">
+              {group.movie.poster_url && (
+                <img
+                  src={group.movie.poster_url}
+                  alt={title}
+                  className="movie-poster"
+                />
+              )}
+              <div className="movie-info">
+                <h3 className="movie-title">{title}</h3>
+                <div className="movie-meta">
+                  {group.movie.certification && (
+                    <span className="movie-cert">
+                      {group.movie.certification}
+                    </span>
+                  )}
+                  {group.movie.runtime && (
+                    <span className="movie-runtime">
+                      {group.movie.runtime} min
+                    </span>
+                  )}
+                  {releaseYear && (
+                    <span className="movie-year">{releaseYear}</span>
+                  )}
                 </div>
+                {group.movie.overview && (
+                  <p className="movie-overview">{group.movie.overview}</p>
+                )}
               </div>
-            ),
-          )}
-        </div>
-      ))}
+            </div>
+            <div className="movie-venues">
+              {Object.entries(group.screeningsByVenue).map(
+                ([venueKey, slotScreenings]) => (
+                  <div key={venueKey} className="company-complex-section">
+                    <h4 className="company-complex-name">{venueKey}</h4>
+                    <div className="screenings-list">
+                      {slotScreenings.map((s) => (
+                        <ScreeningItem key={s.id} screening={s} />
+                      ))}
+                    </div>
+                  </div>
+                ),
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

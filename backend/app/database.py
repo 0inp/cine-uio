@@ -2,6 +2,7 @@ import os
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, delete, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session, contains_eager, selectinload, sessionmaker
 
 from app.entities import (
@@ -10,6 +11,7 @@ from app.entities import (
     Movie,
     Screening,
 )
+from app.logging import logger
 from app.models import (
     CinemaCompany as CinemaCompanyModel,
 )
@@ -24,6 +26,9 @@ from app.models import (
 )
 
 SQLALCHEMY_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./cine_uio.db")
+
+# How many times a title may be looked up on TMDB before we stop retrying it.
+MAX_TMDB_ATTEMPTS = 3
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -69,7 +74,16 @@ def get_all_screenings(
 
     for s in orm_screenings:
         if s.movie.id not in movies:
-            movies[s.movie.id] = Movie(title=s.movie.title)
+            movies[s.movie.id] = Movie(
+                title=s.movie.title,
+                tmdb_id=s.movie.tmdb_id,
+                tmdb_title=s.movie.tmdb_title,
+                poster_path=s.movie.poster_path,
+                overview=s.movie.overview,
+                runtime=s.movie.runtime,
+                certification=s.movie.certification,
+                release_date=s.movie.release_date,
+            )
 
         if s.complex.company.id not in companies:
             companies[s.complex.company.id] = CinemaCompany(
@@ -170,3 +184,66 @@ def save_screenings(db: Session, screenings: list[Screening]) -> None:
 def delete_all_screenings(db: Session) -> None:
     db.execute(delete(ScreeningModel))
     db.commit()
+
+
+def enrich_movies_with_tmdb(db: Session) -> None:
+    """Fetch TMDB metadata for movies that lack it, merging duplicates by tmdb_id.
+
+    Titles TMDB cannot resolve (TV-series arcs like Bleach, or non-films like a football
+    match) would otherwise be re-queried on every single run, forever. Each miss bumps
+    tmdb_attempts and the movie leaves the queue once it hits MAX_TMDB_ATTEMPTS — a few
+    retries still give a genuinely new release time to appear in TMDB's catalogue.
+
+    Progress is committed per movie so a crash mid-run keeps the API work already done.
+    """
+    from app.tmdb import search_movie  # local import avoids circular dependency at module load
+
+    unenriched: list[MovieModel] = list(
+        db.execute(
+            select(MovieModel).where(
+                MovieModel.tmdb_id.is_(None),
+                MovieModel.tmdb_attempts < MAX_TMDB_ATTEMPTS,
+            )
+        )
+        .scalars()
+        .all()
+    )
+    logger.info(f"TMDB enrichment: {len(unenriched)} movies to look up")
+
+    for movie in unenriched:
+        result = search_movie(movie.title)
+
+        if result is None:
+            movie.tmdb_attempts += 1
+            if movie.tmdb_attempts >= MAX_TMDB_ATTEMPTS:
+                logger.info(f"TMDB: giving up on '{movie.title}' after {MAX_TMDB_ATTEMPTS} attempts")
+            db.commit()
+            continue
+
+        existing: MovieModel | None = db.execute(
+            select(MovieModel).where(
+                MovieModel.tmdb_id == result.tmdb_id,
+                MovieModel.id != movie.id,
+            )
+        ).scalar_one_or_none()
+
+        if existing is not None:
+            logger.info(f"Merging '{movie.title}' → '{existing.title}' (tmdb_id={result.tmdb_id})")
+            db.execute(
+                sa_update(ScreeningModel).where(ScreeningModel.movie_id == movie.id).values(movie_id=existing.id)
+            )
+            db.delete(movie)
+        else:
+            movie.tmdb_id = result.tmdb_id
+            movie.tmdb_title = result.tmdb_title
+            movie.poster_path = result.poster_path
+            movie.overview = result.overview
+            movie.runtime = result.runtime
+            movie.certification = result.certification
+            movie.release_date = result.release_date
+
+        # Commit rather than flush: keeps progress durable and makes tmdb_id visible
+        # to the duplicate check of every later movie in this same run.
+        db.commit()
+
+    logger.info("TMDB enrichment complete")

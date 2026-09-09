@@ -21,7 +21,10 @@ def db() -> Generator[Session]:
         poolclass=StaticPool,
     )
     Base.metadata.create_all(engine)
-    Sess = sessionmaker(bind=engine)
+    # Mirror SessionLocal in app/database.py: autoflush=False changes when pending
+    # changes hit the DB, which matters for the delete-after-bulk-update in
+    # enrich_movies_with_tmdb. Tests should exercise production semantics.
+    Sess = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = Sess()
     try:
         yield session

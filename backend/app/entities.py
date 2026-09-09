@@ -18,6 +18,13 @@ class CinemaComplex:
 @dataclass
 class Movie:
     title: str
+    tmdb_id: int | None = None
+    tmdb_title: str | None = None
+    poster_path: str | None = None
+    overview: str | None = None
+    runtime: int | None = None
+    certification: str | None = None
+    release_date: str | None = None
 
 
 @dataclass

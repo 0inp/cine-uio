@@ -37,6 +37,24 @@ class TestGetScreenings:
         assert "company" in s["complex"]
         assert "name" in s["complex"]["company"]
 
+    def test_movie_exposes_tmdb_fields(self, client: TestClient) -> None:
+        movie = client.get("/api/screenings").json()[0]["movie"]
+        assert {
+            "tmdb_id",
+            "tmdb_title",
+            "poster_url",
+            "overview",
+            "runtime",
+            "certification",
+            "release_date",
+        } <= movie.keys()
+
+    def test_movie_tmdb_fields_are_nullable_when_unenriched(self, client: TestClient) -> None:
+        movie = client.get("/api/screenings").json()[0]["movie"]
+        assert movie["tmdb_id"] is None
+        assert movie["tmdb_title"] is None
+        assert movie["poster_url"] is None
+
     def test_filter_by_company_name(self, client: TestClient) -> None:
         data = client.get("/api/screenings", params={"cinema_company_name": "Multicines"}).json()
         assert len(data) == 1
