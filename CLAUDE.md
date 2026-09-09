@@ -29,6 +29,8 @@ mise lint    # mypy + ruff + biome
 mise format  # ruff format + biome write
 mise test    # pytest + vitest
 
+mise run install_hooks  # install the pre-commit hook (once per clone)
+
 mise run dev     # API + Vite dev servers (two origins, CORS applies)
 mise run start   # build SPA, serve it + API from :8000 (single origin) — "prod"
 mise run serve   # expose :8000 on the tailnet over HTTPS

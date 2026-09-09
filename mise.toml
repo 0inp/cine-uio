@@ -114,3 +114,16 @@ run = "tailscale serve reset"
 description = "Refresh screenings and TMDB metadata"
 run = "uv run python scraper_entrypoint.py"
 dir = "{{cwd}}/backend"
+
+# --- Git hooks -------------------------------------------------------------
+# `install_hooks` writes .git/hooks/pre-commit, which git does not version, so it
+# has to be run once per clone. The hook runs the same tasks CI runs, so a commit
+# that passes locally is not one CI will reject on formatting or types.
+
+[tasks.pre-commit]
+description = "Everything CI checks, before the commit lands"
+depends = ["lint", "test"]
+
+[tasks.install_hooks]
+description = "Install the git pre-commit hook (run once per clone)"
+run = "mise generate git-pre-commit --task pre-commit --write"
