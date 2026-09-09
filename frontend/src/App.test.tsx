@@ -29,16 +29,22 @@ const BASE_SCREENING = {
 
 // The app makes two calls: the city list, then that city's screenings. Route by
 // URL rather than by call order, so a test does not depend on which fires first.
+const HEALTHY = { status: "ok", detail: "fresh", hours_since_success: 2 };
+
 function mockFetch(
   screenings: unknown[],
   ok = true,
   cities: string[] = ["Quito"],
+  health: unknown = HEALTHY,
 ): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       if (url.includes("/cities")) {
         return { ok: true, status: 200, json: async () => cities };
+      }
+      if (url.includes("/health")) {
+        return { ok: true, status: 200, json: async () => health };
       }
       return { ok, status: ok ? 200 : 500, json: async () => screenings };
     }),
@@ -425,5 +431,84 @@ describe("city selection", () => {
       ).mock.calls.map((c) => c[0]);
       expect(calls.some((u) => u.includes("city=Cuenca"))).toBe(true);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("staleness banner", () => {
+  const stale = {
+    status: "stale",
+    detail: "the last clean scrape was 50h ago",
+    hours_since_success: 50.4,
+  };
+
+  it("stays quiet when the data is fresh", async () => {
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("warns when the listings may be out of date", async () => {
+    mockFetch([BASE_SCREENING], true, ["Quito"], stale);
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expect(screen.getByRole("status").textContent).toContain(
+      "puede estar desactualizada",
+    );
+  });
+
+  it("says how long ago the data was refreshed", async () => {
+    mockFetch([BASE_SCREENING], true, ["Quito"], stale);
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expect(screen.getByRole("status").textContent).toContain("50 h");
+  });
+
+  it("reports a failed refresh differently from a stale one", async () => {
+    mockFetch([BASE_SCREENING], true, ["Quito"], {
+      status: "failing",
+      detail: "the last scrape lost 7 complex(es)",
+      hours_since_success: 30,
+    });
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expect(screen.getByRole("status").textContent).toContain(
+      "Hubo un problema",
+    );
+  });
+
+  it("stays quiet when no scrape has been recorded yet", async () => {
+    // A fresh install is not a problem worth alarming the reader about.
+    mockFetch([BASE_SCREENING], true, ["Quito"], {
+      status: "unknown",
+      detail: "no scrape has been recorded yet",
+      hours_since_success: null,
+    });
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("says nothing when health cannot be reached", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/health")) throw new Error("offline");
+        if (url.includes("/cities"))
+          return { ok: true, status: 200, json: async () => ["Quito"] };
+        return { ok: true, status: 200, json: async () => [BASE_SCREENING] };
+      }),
+    );
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

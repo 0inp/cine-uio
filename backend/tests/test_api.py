@@ -68,6 +68,15 @@ class TestGetScreenings:
         assert len(client.get("/api/screenings", params={"city": "Quito"}).json()) == 2
         assert client.get("/api/screenings", params={"city": "Guayaquil"}).json() == []
 
+    def test_health_reports_a_status(self, client: TestClient) -> None:
+        body = client.get("/api/health").json()
+        assert body["status"] == "unknown"  # the fixture has no recorded run
+        assert body["complexes_total"] == 2
+
+    def test_health_is_200_even_when_unhealthy(self, client: TestClient) -> None:
+        # A monitor reads the payload; stale listings are not the API being down.
+        assert client.get("/api/health").status_code == 200
+
     def test_filter_by_company_name(self, client: TestClient) -> None:
         data = client.get("/api/screenings", params={"cinema_company_name": "Multicines"}).json()
         assert len(data) == 1

@@ -136,6 +136,27 @@ mise test     # pytest (backend) + vitest (frontend)
 | `VITE_API_URL`            | `http://localhost:8000/api` | API base URL (frontend)                  |
 | `ALLOWED_ORIGINS`         | `http://localhost:5173`     | Comma-separated CORS origins (backend)   |
 | `TMDB_READ_ACCESS_TOKEN`  | *(required for enrichment)* | TMDB Bearer token for movie metadata     |
+| `SCRAPE_WEBHOOK_URL`      | *(optional)*                | Slack/Discord webhook; a failed scrape posts there |
+
+## Observability
+
+Every run is recorded in `scrape_runs` (start, end, complexes succeeded and failed,
+the failure lines), so freshness is a query rather than a guess buried in a log file.
+
+`GET /api/health` reports a `status` of `ok`, `stale`, `failing` or `unknown` with a
+human-readable `detail`, how long ago the last clean run was, and how much of the
+catalogue currently has screenings. It always answers 200: stale listings are not the
+API being down, and a monitor reads the payload.
+
+The frontend shows a banner when the status is `stale` or `failing` — without it the
+site serves week-old listings as confidently as today's. It stays quiet on `unknown`,
+which is just a fresh install.
+
+A failed run posts to `SCRAPE_WEBHOOK_URL` if one is set, and so does the first clean
+run after a failure, so a return to health is not left to guesswork. The payload
+carries both `text` and `content` so the same webhook works for Slack or Discord.
+A missing or unreachable webhook is logged and ignored — it must not turn a failed
+scrape into a crash.
 
 ## Domain Glossary
 

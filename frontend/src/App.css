@@ -45,6 +45,21 @@
   gap: 20px;
 }
 
+.health-notice {
+  text-align: center;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  margin: 0 0 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--accent-bg);
+  color: var(--text);
+}
+
+.health-failing {
+  border-color: #c0392b;
+}
+
 .city-picker {
   display: flex;
   align-items: center;

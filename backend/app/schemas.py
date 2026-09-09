@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, computed_field
 
@@ -50,3 +51,18 @@ class ScreeningSchema(BaseModel):
     language: str
     complex: CinemaComplexSchema
     movie: MovieSchema
+
+
+class HealthSchema(BaseModel):
+    """Whether what the site is serving can be trusted, and why."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    status: Literal["ok", "stale", "failing", "unknown"]
+    detail: str
+    last_run_at: datetime | None
+    last_success_at: datetime | None
+    hours_since_success: float | None
+    complexes_total: int
+    complexes_with_screenings: int
+    upcoming_screenings: int

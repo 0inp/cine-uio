@@ -11,7 +11,8 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.database import get_all_cities, get_all_screenings, get_db  # noqa: E402
-from app.schemas import ScreeningSchema  # noqa: E402
+from app.observability import current_health  # noqa: E402
+from app.schemas import HealthSchema, ScreeningSchema  # noqa: E402
 
 app = FastAPI()
 
@@ -41,6 +42,16 @@ def get_screenings(
 @app.get("/api/cities", response_model=list[str])
 def get_cities(db: Session = Depends(get_db)) -> list[str]:
     return get_all_cities(db)
+
+
+@app.get("/api/health", response_model=HealthSchema)
+def get_health(db: Session = Depends(get_db)) -> HealthSchema:
+    """Always 200: the payload carries the verdict, so a monitor reads `status`.
+
+    Returning 5xx for stale data would make the API look down when it is merely
+    serving old listings, which is a different problem with a different fix.
+    """
+    return HealthSchema.model_validate(current_health(db))
 
 
 def mount_frontend(app: FastAPI, dist_dir: Path) -> bool:
