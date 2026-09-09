@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Installed by `mise run install_hooks`. Versioned here rather than left to
+# `mise generate git-pre-commit` so that it can degrade gracefully.
+#
+# Runs the same lint and test tasks CI runs. Skips when the task is absent:
+# checking out a branch from before the task existed, or bisecting through one,
+# should not block committing.
+
+if ! command -v mise >/dev/null 2>&1; then
+    echo "pre-commit: mise not found, skipping checks" >&2
+    exit 0
+fi
+
+if ! mise tasks 2>/dev/null | grep -q '^pre-commit[[:space:]]'; then
+    exit 0
+fi
+
+STAGED="$(git diff-index --cached --name-only -z HEAD | xargs -0)"
+export STAGED
+export MISE_PRE_COMMIT=1
+exec mise run pre-commit "$@"

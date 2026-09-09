@@ -126,4 +126,7 @@ depends = ["lint", "test"]
 
 [tasks.install_hooks]
 description = "Install the git pre-commit hook (run once per clone)"
-run = "mise generate git-pre-commit --task pre-commit --write"
+run = [
+  "cp ops/pre-commit .git/hooks/pre-commit",
+  "chmod +x .git/hooks/pre-commit",
+]
