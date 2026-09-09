@@ -35,9 +35,11 @@ class SupercinesScraper(Scraper):
             logger.warning("No script content found containing 'self.__next_f.push' and 'initialData'")
             return
 
-        sanitized_script_content: str = re.sub(
-            r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), script_content
-        ).replace("\\n", "").replace("\\", "")
+        sanitized_script_content: str = (
+            re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), script_content)
+            .replace("\\n", "")
+            .replace("\\", "")
+        )
         try:
             json_match: re.Match | None = re.search(
                 r'.*?("initialData".*)\}\]\]"\]\)',

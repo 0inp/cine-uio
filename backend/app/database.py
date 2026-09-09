@@ -104,10 +104,7 @@ def get_all_cinema_companies(db: Session, cinema_company_name: str | None = None
     result = db.execute(query)
     orm_companies = result.unique().scalars().all()
 
-    return [
-        CinemaCompany(name=orm_company.name, base_url=orm_company.base_url)
-        for orm_company in orm_companies
-    ]
+    return [CinemaCompany(name=orm_company.name, base_url=orm_company.base_url) for orm_company in orm_companies]
 
 
 def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_name: str) -> list[CinemaComplex]:
@@ -135,9 +132,7 @@ def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_nam
 
 def save_screenings(db: Session, screenings: list[Screening]) -> None:
     existing_movies_result = db.execute(select(MovieModel))
-    existing_movies: dict[str, int] = {
-        movie.title: movie.id for movie in existing_movies_result.scalars().all()
-    }
+    existing_movies: dict[str, int] = {movie.title: movie.id for movie in existing_movies_result.scalars().all()}
 
     existing_complexes_result = db.execute(select(CinemaComplexModel))
     existing_complexes: dict[str, int] = {

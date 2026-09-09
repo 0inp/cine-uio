@@ -9,8 +9,8 @@ from app.database import get_db
 
 
 @pytest.fixture
-def client(seeded_db: Session) -> Generator[TestClient, None, None]:
-    def override_get_db() -> Generator[Session, None, None]:
+def client(seeded_db: Session) -> Generator[TestClient]:
+    def override_get_db() -> Generator[Session]:
         yield seeded_db
 
     app.dependency_overrides[get_db] = override_get_db

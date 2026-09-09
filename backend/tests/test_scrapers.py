@@ -10,9 +10,7 @@ _UNICODE_ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
 
 
 def _sanitize(content: str) -> str:
-    return _UNICODE_ESCAPE.sub(
-        lambda m: chr(int(m.group(1), 16)), content
-    ).replace("\\n", "").replace("\\", "")
+    return _UNICODE_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), content).replace("\\n", "").replace("\\", "")
 
 
 def _split_format_language(tecnology: str) -> tuple[str, str]:
