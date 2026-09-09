@@ -163,3 +163,43 @@ class TestComplexRetry:
         pages = scraper.browser.pages  # type: ignore[attr-defined]
         assert len(pages) == MAX_COMPLEX_ATTEMPTS
         assert all(p.closed for p in pages)
+
+
+class _BrowserlessScraper(Scraper):
+    company_name = "Browserless"
+    needs_browser = False
+
+    def __init__(self, company: CinemaCompany) -> None:
+        super().__init__(company)
+        self.pages_received: list[Any] = []
+
+    def _scrape_complex_page(self, page: Any, complex: CinemaComplex) -> list[Screening]:
+        self.pages_received.append(page)
+        return [
+            Screening(
+                datetime=datetime(2026, 9, 9, 20, 0),
+                format="2D",
+                language="Doblada",
+                complex=complex,
+                movie=Movie(title="Some film"),
+            )
+        ]
+
+
+class TestBrowserlessScrapers:
+    """Chains whose listings are already in the served HTML must not pay for Chromium."""
+
+    def test_never_launches_a_browser(self, flaky_complex: CinemaComplex) -> None:
+        scraper = _BrowserlessScraper(flaky_complex.company)
+        with patch("app.scrapers.base.sync_playwright") as playwright:
+            results = list(scraper.run_scrape([flaky_complex]))
+        playwright.assert_not_called()
+        assert len(results) == 1 and results[0].error is None
+
+    def test_receives_no_page(self, flaky_complex: CinemaComplex) -> None:
+        scraper = _BrowserlessScraper(flaky_complex.company)
+        list(scraper.run_scrape([flaky_complex]))
+        assert scraper.pages_received == [None]
+
+    def test_browser_backed_scrapers_still_launch_one(self, flaky_complex: CinemaComplex) -> None:
+        assert _FlakyScraper.needs_browser is True

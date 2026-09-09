@@ -22,6 +22,10 @@ RETRY_BACKOFF_SECONDS = 5.0
 
 class Scraper(ABC):
     company_name: ClassVar[str]
+    # Only chains whose listings need a rendered page pay for a browser. Supercines
+    # embeds everything in the served HTML, so launching Chromium for it cost ~3.5s
+    # per venue for nothing.
+    needs_browser: ClassVar[bool] = True
     _registry: ClassVar[dict[str, type[Scraper]]] = {}
 
     def __init_subclass__(cls: type[Scraper], **kwargs: object) -> None:
@@ -40,8 +44,11 @@ class Scraper(ABC):
         self.company: CinemaCompany = company
 
     @abstractmethod
-    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> list[Screening]:
-        """Return the screenings found for one complex. Raise if the page cannot be read."""
+    def _scrape_complex_page(self, page: Page | None, complex: CinemaComplex) -> list[Screening]:
+        """Return the screenings found for one complex. Raise if the page cannot be read.
+
+        `page` is None for scrapers that declare `needs_browser = False`.
+        """
 
     def run_scrape(self, complexes: list[CinemaComplex]) -> Iterator[ComplexScrapeResult]:
         """Yield an outcome per complex, as soon as each one is scraped.
@@ -52,6 +59,11 @@ class Scraper(ABC):
         """
         logger.info(f"Starting to scrape company: {self.company.name}")
 
+        if not self.needs_browser:
+            for complex in complexes:
+                yield self._scrape_one_complex(None, complex)
+            return
+
         with sync_playwright() as p:
             browser: Browser = p.chromium.launch(headless=True)
             try:
@@ -60,7 +72,7 @@ class Scraper(ABC):
             finally:
                 browser.close()
 
-    def _scrape_one_complex(self, browser: Browser, complex: CinemaComplex) -> ComplexScrapeResult:
+    def _scrape_one_complex(self, browser: Browser | None, complex: CinemaComplex) -> ComplexScrapeResult:
         """Scrape one complex, retrying a transient failure before giving up on it."""
         label = f"{self.company.name} / {complex.name}"
         last_error = "scrape did not run"
@@ -68,7 +80,7 @@ class Scraper(ABC):
         for attempt in range(1, MAX_COMPLEX_ATTEMPTS + 1):
             page: Page | None = None
             try:
-                page = browser.new_page()
+                page = browser.new_page() if browser is not None else None
                 screenings = self._scrape_complex_page(page, complex)
             except Exception as e:
                 last_error = str(e) or type(e).__name__

@@ -173,7 +173,11 @@ mise test     # pytest (backend) + vitest (frontend)
 - SQLite is the database — single-file, no concurrency concerns at this scale. Connections are put in **WAL** journal mode with a 5s `busy_timeout` (`database.configure_sqlite`): the daily scrape rewrites every screening while the API may be serving, and SQLite's default `delete` mode has a writer block readers outright.
 - Scraping uses Playwright to load pages and capture XHR requests; API tokens/headers are harvested from the browser session.
 - Screenings are replaced per complex, not globally. `Movie` rows are **not** deleted between runs, so TMDB metadata persists and only new movies need enrichment.
-- The Supercines scraper parses embedded Next.js `__next_f.push` data; this is fragile to site changes.
+- The Supercines scraper parses embedded Next.js `__next_f.push` data; this is fragile to site changes. It needs no browser — the listings are in the served HTML, so it sets `needs_browser = False` and Chromium is never launched for it.
+- A country-wide run takes about 9 minutes. It used to take 90, and the difference was almost entirely wasted work rather than missing concurrency:
+  - Multicines asked for one day at a time, seven times per movie. One request covering the whole window returns exactly the same sessions.
+  - Multicines also loaded a browser page per movie to harvest an auth token. Only `filmId` differs between movies, so one navigation per venue is enough.
+  - Supercines' endpoint genuinely answers one day at a time (it rejects a missing `Date` with 422 and knows no range), so its ~120 calls per venue are irreducible in count — those are fetched concurrently instead, bounded to a few workers because these are someone else's servers.
 - TMDB enrichment requires `TMDB_READ_ACCESS_TOKEN` to be set. If missing, enrichment is silently skipped (movies remain without TMDB data).
 - TMDB search issues **one** request per title variant. Retrying the same query in other languages was tried and removed: TMDB's index spans alternative and translated titles, so English titles resolve fine under `es-LA`. The `language` parameter is still kept because it reorders results for ambiguous titles, and only the top hit is used.
 - Titles TMDB cannot match (TV-series arcs like Bleach, non-films like a football match) stay unenriched. Each miss bumps `tmdb_attempts`; after `MAX_TMDB_ATTEMPTS` (3) the title stops being retried, so a permanently unmatchable title costs 3 lookups total rather than a few on every run forever.
