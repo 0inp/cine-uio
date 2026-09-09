@@ -2,34 +2,65 @@
 import json
 import re
 from datetime import date, datetime, timedelta
+from typing import Any
 
 import requests
-from playwright.sync_api import ElementHandle, Page
+from playwright.sync_api import Page
 
 from app.entities import CinemaComplex, Movie, Screening
 from app.logging import logger
 from app.scrapers.base import Scraper
+from app.scrapers.fetching import fetch_json_all
+
+# Supercines serves a different page to an unidentified client.
+_USER_AGENT = "Mozilla/5.0 (compatible; cine-uio/1.0)"
+
+
+DAYS_AHEAD = 7
+
+
+def _parse_day(payload: Any, day: date, complex: CinemaComplex, movie: Movie) -> list[Screening]:
+    """Turn one day's technologies payload into screenings. Empty payload -> nothing."""
+    content = (payload or {}).get("content") or {}
+    screenings: list[Screening] = []
+    for tecnology in content.get("tecnologies") or []:
+        label: str = tecnology.get("tecnology", "")
+        parts = label.rsplit(" ", 1)
+        screening_format = parts[0] if len(parts) > 1 else label
+        screening_language = parts[1] if len(parts) > 1 else ""
+        for schedule in tecnology.get("schedules", []):
+            start = str(schedule.get("time", ""))
+            if not start:
+                continue
+            screenings.append(
+                Screening(
+                    datetime=datetime.strptime(f"{day:%Y-%m-%d} {start}", "%Y-%m-%d %H:%M"),
+                    format=screening_format,
+                    language=screening_language,
+                    complex=complex,
+                    movie=movie,
+                )
+            )
+    return screenings
 
 
 class SupercinesScraper(Scraper):
     company_name = "Supercines"
+    # The listings are already in the served HTML — rendering the page bought
+    # nothing and cost roughly 3.5s a venue.
+    needs_browser = False
 
-    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> list[Screening]:
+    def _scrape_complex_page(self, page: Page | None, complex: CinemaComplex) -> list[Screening]:
         url = f"{complex.company.base_url}{complex.url_part}"
         logger.info(f"Scraping complex: {url}")
-        page.goto(url, wait_until="networkidle")
+        response = requests.get(url, headers={"User-Agent": _USER_AGENT}, timeout=30)
+        response.raise_for_status()
 
-        scripts: list[ElementHandle] = page.query_selector_all("script")
-
-        script_content = None
-
-        for script in scripts:
-            content: str | None = script.text_content()
-            if content and "self.__next_f.push" in content and "initialData" in content:
-                script_content = content
-                break
-
-        if not script_content:
+        # The whole document is handed to the sanitizer rather than a single <script>
+        # element: the payload marker below is unique in the page, and matching script
+        # tags by hand is more brittle than letting the marker find itself.
+        script_content = response.text
+        if "self.__next_f.push" not in script_content or "initialData" not in script_content:
             # Raise rather than return nothing: an unreadable page is a failed scrape,
             # and reporting it keeps this complex's previous screenings published.
             raise ValueError("no script tag containing 'self.__next_f.push' and 'initialData'")
@@ -53,75 +84,39 @@ class SupercinesScraper(Scraper):
 
             movies_data: list[dict[str, str | int | None]] = json.loads(json_str).get("initialData", [])
 
-            today: datetime = datetime.now()
-            six_days_later: datetime = today + timedelta(days=6)
-            movies: list[Movie] = []
-            screenings: list[Screening] = []
-            for movie_data in movies_data:
-                movie_screenings: list[Screening] = []
-                movie_title: str = str(movie_data.get("title", "")).strip()
-                logger.info(f"Handling movie {movie_title}...")
+            today: date = datetime.now().date()
+            days = [today + timedelta(days=i) for i in range(DAYS_AHEAD)]
+            cutoff = today + timedelta(days=DAYS_AHEAD - 1)
 
-                current_date: date = today.date()
-                opening_date_str: str = str(movie_data.get("openingDate", ""))
-                opening_date: datetime = datetime.strptime(opening_date_str, "%Y-%m-%d")
-                if opening_date >= six_days_later:
-                    logger.info("jumping this movie")
+            # Build every (movie, day) request first. The endpoint answers one day at
+            # a time — it rejects a missing Date with 422 and knows no range — so the
+            # only lever on ~120 calls per venue is to stop making them one at a time.
+            wanted: list[tuple[Movie, date, str]] = []
+            movies: list[Movie] = []
+            for movie_data in movies_data:
+                movie_title: str = str(movie_data.get("title", "")).strip()
+                opening_date = datetime.strptime(str(movie_data.get("openingDate", "")), "%Y-%m-%d").date()
+                if opening_date > cutoff:
+                    logger.info(f"{movie_title}: opens after the window, skipping")
                     continue
 
-                movie: Movie = Movie(
-                    title=movie_title,
-                )
+                movie = Movie(title=movie_title)
                 movies.append(movie)
+                movie_id = str(movie_data.get("id"))
+                base_xhr_url = f"https://www.supercines.com/api/proxy/movies/tecnologies?Id={movie_id}&Channel=web"
+                wanted.extend((movie, day, f"{base_xhr_url}&Date={day:%Y-%m-%d}") for day in days)
 
-                supercines_movie_id: str = str(movie_data.get("id"))
-                base_xhr_url = (
-                    f"https://www.supercines.com/api/proxy/movies/tecnologies?Id={supercines_movie_id}&Channel=web"
-                )
+            payloads = fetch_json_all([url for _, _, url in wanted], headers={"User-Agent": _USER_AGENT})
 
-                while current_date < six_days_later.date():
-                    date_query_param: str = current_date.strftime("%Y-%m-%d")
-                    xhr_url = f"{base_xhr_url}&Date={date_query_param}"
+            screenings: list[Screening] = []
+            per_movie: dict[str, int] = {}
+            for (movie, day, _), payload in zip(wanted, payloads, strict=True):
+                found = _parse_day(payload, day, complex, movie)
+                per_movie[movie.title] = per_movie.get(movie.title, 0) + len(found)
+                screenings.extend(found)
 
-                    response = requests.get(xhr_url)
-                    if not response.status_code == 200:
-                        current_date += timedelta(days=1)
-                        continue
-
-                    response_data = response.json()
-                    response_content = response_data.get("content", {})
-                    tecnologies = response_content.get("tecnologies", []) if response_content else []
-                    if not tecnologies:
-                        current_date += timedelta(days=1)
-                        continue
-
-                    for tecnology in tecnologies:
-                        tecnology_str: str = tecnology.get("tecnology", "")
-                        parts = tecnology_str.rsplit(" ", 1)
-                        screening_format: str = parts[0] if len(parts) > 1 else tecnology_str
-                        screening_language: str = parts[1] if len(parts) > 1 else ""
-                        tecnology_schedules: list[dict[str, int | str | bool]] = tecnology.get("schedules", [])
-                        for tecnology_schedule in tecnology_schedules:
-                            tecnology_schedule_time: str = str(tecnology_schedule.get("time", ""))
-                            if not tecnology_schedule_time:
-                                continue
-                            screening_datetime: datetime = datetime.strptime(
-                                date_query_param + " " + tecnology_schedule_time,
-                                "%Y-%m-%d %H:%M",
-                            )
-                            screening: Screening = Screening(
-                                datetime=screening_datetime,
-                                format=screening_format,
-                                language=screening_language,
-                                complex=complex,
-                                movie=movie,
-                            )
-                            movie_screenings.append(screening)
-
-                    current_date += timedelta(days=1)
-
-                logger.info(f"Movie {movie_title} has {len(movie_screenings)} screenings")
-                screenings.extend(movie_screenings)
+            for title, count in per_movie.items():
+                logger.info(f"Movie {title} has {count} screenings")
 
         except json.JSONDecodeError as e:
             # Let it propagate: run_scrape records the complex as failed, and its

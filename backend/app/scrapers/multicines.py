@@ -3,14 +3,14 @@ import re
 import unicodedata
 from datetime import date, datetime, time, timedelta
 from typing import TypedDict
-from urllib.parse import parse_qs, urlparse, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-import requests
 from playwright.sync_api import Page
 
 from app.entities import CinemaComplex, Movie, Screening
 from app.logging import logger
 from app.scrapers.base import Scraper
+from app.scrapers.fetching import fetch_json_all
 
 
 class ScreeningsResponseDict(TypedDict):
@@ -33,95 +33,89 @@ def _title_to_slug(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ascii_str.lower()).strip("-")
 
 
+DAYS_AHEAD = 7
+
+
+def _day_bounds(first: date, days: int) -> tuple[str, str]:
+    """TMDB-style millisecond timestamps spanning `days` from `first`, inclusive."""
+    start = datetime.combine(first, time.min)
+    end = datetime.combine(first + timedelta(days=days - 1), time(23, 59, 59, 999000))
+    fmt = lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"  # noqa: E731
+    return fmt(start), fmt(end)
+
+
+def _parse_sessions(payload: list[ScreeningsResponseDict], complex: CinemaComplex, movie: Movie) -> list[Screening]:
+    screenings: list[Screening] = []
+    for entry in payload:
+        language: str = entry["name"]
+        for theater_type in entry["theaterTypes"]:
+            screening_format: str = theater_type["name"]
+            for session in theater_type["sessions"]:
+                screenings.append(
+                    Screening(
+                        datetime=datetime.fromisoformat(session["showtime"]),
+                        format=screening_format,
+                        language=language,
+                        complex=complex,
+                        movie=movie,
+                    )
+                )
+    return screenings
+
+
 class MulticinesScraper(Scraper):
     company_name = "Multicines"
 
-    def _scrape_complex_page(self, page: Page, complex: CinemaComplex) -> list[Screening]:
+    def _scrape_complex_page(self, page: Page | None, complex: CinemaComplex) -> list[Screening]:
+        if page is None:  # pragma: no cover - needs_browser is True for this scraper
+            raise RuntimeError("MulticinesScraper needs a browser page")
+
         url = f"{complex.company.base_url}{complex.url_part}"
         logger.info(f"Scraping complex: {url}")
         page.goto(url)
 
-        screenings_response = page.wait_for_event(
+        movies_response = page.wait_for_event(
             "response",
             lambda response: (
                 "multicines.api.x-mart.io/api/multicines-mw/movies" in response.url
                 and "sessions/now" not in response.url
             ),
         )
+        movies: dict[str, Movie] = {m["externalId"]: Movie(title=m["title"].title()) for m in movies_response.json()}
+        logger.info(f"Encountered {len(movies)} movies")
+        if not movies:
+            return []
 
-        response_json = screenings_response.json()
-        movies_by_multicines_ids: dict[str, Movie] = {}
+        # One navigation, not one per movie. The sessions request only varies by
+        # filmId between movies — the auth token and every other parameter are
+        # shared — so the rest of the catalogue is fetched over plain HTTP.
+        first_id, first_movie = next(iter(movies.items()))
+        page.goto(f"{complex.company.base_url}/movie/{_title_to_slug(first_movie.title)}/{first_id}")
+        captured = page.wait_for_event(
+            "request",
+            lambda request: "multicines.api.x-mart.io/api/multicines-mw/sessions" in request.url,
+        )
 
-        movies: list[Movie] = []
-        for movie_json in response_json:
-            movie_multicines_id: str = movie_json["externalId"]
-            movie: Movie = Movie(title=movie_json["title"].title())
-            movies_by_multicines_ids[movie_multicines_id] = movie
-            movies.append(movie)
-        logger.info(f"Encountered {len(movies_by_multicines_ids)} movies")
+        headers: dict[str, str] = captured.headers
+        parsed = urlparse(captured.url)
+        base_params: dict[str, list[str]] = parse_qs(parsed.query)
+        api_url = urlunparse((parsed.scheme, parsed.netloc, parsed.path, "", "", ""))
+
+        # One request per movie covering the whole window. Asking day by day returned
+        # exactly the same sessions for 7x the calls.
+        date_from, date_to = _day_bounds(date.today(), DAYS_AHEAD)
+
+        ordered = list(movies.items())
+        urls = [
+            f"{api_url}?{urlencode({**base_params, 'filmId': [film_id], 'dateFrom': [date_from], 'dateTo': [date_to]}, doseq=True)}"
+            for film_id, _ in ordered
+        ]
+        payloads = fetch_json_all(urls, headers=headers)
 
         screenings: list[Screening] = []
-        for movie_id, movie in movies_by_multicines_ids.items():
-            movie_screenings: list[Screening] = []
-            movie_url = f"{complex.company.base_url}/movie/{_title_to_slug(movie.title)}/{movie_id}"
-            logger.info(f"Navigating to movie: {movie_url}")
-            page.goto(movie_url)
-
-            captured_request = page.wait_for_event(
-                "request",
-                lambda request: "multicines.api.x-mart.io/api/multicines-mw/sessions" in request.url,
-            )
-
-            request_headers: dict[str, str] = captured_request.headers
-
-            parsed_url = urlparse(captured_request.url)
-            request_query_params: dict[str, list[str]] = parse_qs(parsed_url.query)
-
-            # Reconstruct the base API URL WITHOUT the query string
-            base_api_url = urlunparse((parsed_url.scheme, parsed_url.netloc, parsed_url.path, "", "", ""))
-
-            today = date.today()
-            for i in range(7):
-                current_day = today + timedelta(days=i)
-
-                start_dt = datetime.combine(current_day, time.min)
-                end_dt = datetime.combine(current_day, time(23, 59, 59, 999000))
-
-                start_str = start_dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-                end_str = end_dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-
-                request_query_params["dateFrom"] = [start_str]
-                request_query_params["dateTo"] = [end_str]
-
-                screenings_response = requests.get(
-                    base_api_url,
-                    headers=request_headers,
-                    params=request_query_params,
-                )
-
-                if screenings_response.status_code == 200:
-                    screenings_json: list[ScreeningsResponseDict] = screenings_response.json()
-                    for screening_json in screenings_json:
-                        screening_language: str = screening_json["name"]
-                        screening_theater_types: list[ScreeningTheaterTypeDict] = screening_json["theaterTypes"]
-                        for screening_theater_type in screening_theater_types:
-                            screening_format: str = screening_theater_type["name"]
-                            screening_sessions: list[ScreeningSessionDict] = screening_theater_type["sessions"]
-                            for screening_session in screening_sessions:
-                                screening_datetime = screening_session["showtime"]
-                                screening = Screening(
-                                    datetime=datetime.fromisoformat(screening_datetime),
-                                    format=screening_format,
-                                    language=screening_language,
-                                    complex=complex,
-                                    movie=movie,
-                                )
-                                movie_screenings.append(screening)
-                else:
-                    logger.error(f"Error {screenings_response.status_code}: {screenings_response.text}")
-
+        for (_, movie), payload in zip(ordered, payloads, strict=True):
+            movie_screenings = _parse_sessions(payload or [], complex, movie)
             logger.info(f"Movie {movie.title} has {len(movie_screenings)} screenings")
-
             screenings.extend(movie_screenings)
 
         logger.info(
