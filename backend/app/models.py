@@ -35,6 +35,16 @@ class Movie(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String)
+    tmdb_id: Mapped[int | None] = mapped_column(nullable=True, unique=True, index=True)
+    tmdb_title: Mapped[str | None] = mapped_column(String, nullable=True)
+    poster_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    overview: Mapped[str | None] = mapped_column(String, nullable=True)
+    runtime: Mapped[int | None] = mapped_column(nullable=True)
+    certification: Mapped[str | None] = mapped_column(String, nullable=True)
+    release_date: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Bookkeeping only, never exposed through the API: how many times TMDB has been
+    # asked about this title. Lets enrichment stop retrying titles TMDB cannot resolve.
+    tmdb_attempts: Mapped[int] = mapped_column(default=0, server_default="0")
 
     screenings: Mapped[list[Screening]] = relationship(back_populates="movie")
 

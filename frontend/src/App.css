@@ -45,6 +45,14 @@
   gap: 20px;
 }
 
+.date-notice {
+  text-align: center;
+  color: var(--text);
+  font-size: 0.9rem;
+  margin: -16px 0 24px;
+  opacity: 0.7;
+}
+
 .movie-card {
   background: var(--social-bg);
   border: 1px solid var(--border);
@@ -55,16 +63,73 @@
   width: 95%;
 }
 
-.complex-section {
-  margin: 12px 0;
+.movie-header {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.movie-poster {
+  width: 80px;
+  min-width: 80px;
+  border-radius: 4px;
+  object-fit: cover;
+  align-self: flex-start;
+}
+
+.movie-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .movie-title {
   font-size: 1.5rem;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   color: var(--accent);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 10px;
+}
+
+.movie-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.movie-cert,
+.movie-runtime,
+.movie-year {
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--text);
+}
+
+.movie-cert {
+  font-weight: 600;
+}
+
+.movie-overview {
+  font-size: 0.85rem;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.movie-venues {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.complex-section {
+  margin: 12px 0;
 }
 
 .screenings-list {

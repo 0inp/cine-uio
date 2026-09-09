@@ -4,9 +4,20 @@ Script to run the scrapers for cinema data.
 
 import sys
 
-from app.database import SessionLocal, delete_all_screenings, get_all_cinema_companies
-from app.logging import logger
-from app.scrapers.base import Scraper
+from dotenv import load_dotenv
+
+# Must run before importing app.*: database.py reads DATABASE_URL and tmdb.py reads
+# TMDB_READ_ACCESS_TOKEN, so the .env has to be loaded before those modules are imported.
+load_dotenv()
+
+from app.database import (  # noqa: E402
+    SessionLocal,
+    delete_all_screenings,
+    enrich_movies_with_tmdb,
+    get_all_cinema_companies,
+)
+from app.logging import logger  # noqa: E402
+from app.scrapers.base import Scraper  # noqa: E402
 
 
 def main() -> None:
@@ -25,11 +36,23 @@ def main() -> None:
 
     for company in cinema_companies:
         logger.info(f"Processing company: {company.name}")
-
         scraper = Scraper.create(company)
         scraper.run_scrape()
 
-    logger.info("Scraping completed successfully!")
+    db_session = SessionLocal()
+    enrichment_ok = True
+    try:
+        enrich_movies_with_tmdb(db_session)
+    except Exception as e:
+        enrichment_ok = False
+        logger.error(f"TMDB enrichment failed: {e}", exc_info=True)
+    finally:
+        db_session.close()
+
+    if enrichment_ok:
+        logger.info("Scraping completed successfully!")
+    else:
+        logger.warning("Scraping completed, but TMDB enrichment failed — movies may lack metadata")
 
 
 if __name__ == "__main__":

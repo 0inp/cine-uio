@@ -1,16 +1,22 @@
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import (
+    MAX_TMDB_ATTEMPTS,
     delete_all_screenings,
+    enrich_movies_with_tmdb,
     get_all_cinema_companies,
     get_all_cinema_complexes_from_cinema_company,
     get_all_screenings,
     save_screenings,
 )
 from app.entities import CinemaCompany, CinemaComplex, Movie, Screening
+from app.models import Movie as MovieModel
+from app.tmdb import TMDBMovie
 
 
 def _make_screening(
@@ -90,6 +96,132 @@ class TestGetAllScreenings:
 
     def test_unknown_filter_returns_empty(self, seeded_db: Session) -> None:
         assert get_all_screenings(seeded_db, cinema_company_name="Ghost") == []
+
+
+def _tmdb_result(tmdb_id: int = 862, title: str = "Toy Story 5") -> TMDBMovie:
+    return TMDBMovie(
+        tmdb_id=tmdb_id,
+        tmdb_title=title,
+        poster_path="/poster.jpg",
+        overview="Woody and Buzz are back.",
+        runtime=90,
+        certification="G",
+        release_date="2026-06-20",
+    )
+
+
+class TestEnrichMoviesWithTmdb:
+    def test_populates_tmdb_fields(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Toy Story 5", "CCI", "Multicines")])
+        with patch("app.tmdb.search_movie", return_value=_tmdb_result()):
+            enrich_movies_with_tmdb(bare_db)
+        movie = bare_db.execute(select(MovieModel)).scalar_one()
+        assert movie.tmdb_id == 862
+        assert movie.tmdb_title == "Toy Story 5"
+        assert movie.poster_path == "/poster.jpg"
+        assert movie.runtime == 90
+        assert movie.certification == "G"
+
+    def test_merges_duplicate_titles_sharing_tmdb_id(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Toy Story 5", "CCI", "Multicines")])
+        save_screenings(bare_db, [_make_screening("Toy Story Five", "San Luis", "Supercines")])
+
+        with patch("app.tmdb.search_movie", return_value=_tmdb_result()):
+            enrich_movies_with_tmdb(bare_db)
+
+        movies = list(bare_db.execute(select(MovieModel)).scalars().all())
+        assert len(movies) == 1
+        screenings = get_all_screenings(bare_db)
+        assert len(screenings) == 2
+
+    def test_no_unique_violation_when_multiple_titles_resolve_to_same_tmdb_id_in_same_run(
+        self, bare_db: Session
+    ) -> None:
+        # Regression: without db.flush() after each assignment, the second movie fails
+        # with a UNIQUE constraint error on tmdb_id at commit time.
+        save_screenings(bare_db, [_make_screening("Jackass", "CCI", "Multicines")])
+        save_screenings(bare_db, [_make_screening("Jackass: La Última Y Nos Vamos", "San Luis", "Supercines")])
+        save_screenings(
+            bare_db, [_make_screening("Jackass: Forever", "CCI", "Multicines", dt=datetime(2026, 6, 25, 16, 0))]
+        )
+
+        with patch(
+            "app.tmdb.search_movie", return_value=_tmdb_result(tmdb_id=1612018, title="Jackass: Lo mejor para el final")
+        ):
+            enrich_movies_with_tmdb(bare_db)  # must not raise
+
+        movies = list(bare_db.execute(select(MovieModel)).scalars().all())
+        assert len(movies) == 1
+        assert movies[0].tmdb_id == 1612018
+
+    def test_skips_already_enriched_movies(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Toy Story 5", "CCI", "Multicines")])
+        movie = bare_db.execute(select(MovieModel)).scalar_one()
+        movie.tmdb_id = 862
+        bare_db.commit()
+
+        with patch("app.tmdb.search_movie") as mock_search:
+            enrich_movies_with_tmdb(bare_db)
+            mock_search.assert_not_called()
+
+    def test_leaves_movie_unenriched_when_no_tmdb_result(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Obscure Local Film", "CCI", "Multicines")])
+        with patch("app.tmdb.search_movie", return_value=None):
+            enrich_movies_with_tmdb(bare_db)
+        movie = bare_db.execute(select(MovieModel)).scalar_one()
+        assert movie.tmdb_id is None
+
+    def test_enriched_fields_visible_via_get_all_screenings(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Toy Story 5", "CCI", "Multicines")])
+        with patch("app.tmdb.search_movie", return_value=_tmdb_result()):
+            enrich_movies_with_tmdb(bare_db)
+        result = get_all_screenings(bare_db)[0]
+        assert result.movie.tmdb_id == 862
+        assert result.movie.poster_path == "/poster.jpg"
+
+
+class TestTmdbAttemptPolicy:
+    def test_a_miss_increments_the_attempt_counter(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Mexico Vs Ecuador", "CCI", "Multicines")])
+        with patch("app.tmdb.search_movie", return_value=None):
+            enrich_movies_with_tmdb(bare_db)
+        movie = bare_db.execute(select(MovieModel)).scalar_one()
+        assert movie.tmdb_attempts == 1
+
+    def test_repeated_misses_accumulate_then_stop_being_retried(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Mexico Vs Ecuador", "CCI", "Multicines")])
+        with patch("app.tmdb.search_movie", return_value=None) as mock_search:
+            for _ in range(MAX_TMDB_ATTEMPTS + 2):
+                enrich_movies_with_tmdb(bare_db)
+        # Runs past the cap must not reach TMDB at all.
+        assert mock_search.call_count == MAX_TMDB_ATTEMPTS
+        movie = bare_db.execute(select(MovieModel)).scalar_one()
+        assert movie.tmdb_attempts == MAX_TMDB_ATTEMPTS
+        assert movie.tmdb_id is None
+
+    def test_a_successful_lookup_leaves_the_counter_alone(self, bare_db: Session) -> None:
+        save_screenings(bare_db, [_make_screening("Toy Story 5", "CCI", "Multicines")])
+        with patch("app.tmdb.search_movie", return_value=_tmdb_result()):
+            enrich_movies_with_tmdb(bare_db)
+        movie = bare_db.execute(select(MovieModel)).scalar_one()
+        assert movie.tmdb_attempts == 0
+
+    def test_progress_survives_a_crash_partway_through(self, bare_db: Session) -> None:
+        # Each movie is committed as it goes, so API work already done is not lost.
+        save_screenings(bare_db, [_make_screening("Toy Story 5", "CCI", "Multicines")])
+        save_screenings(bare_db, [_make_screening("Supergirl", "San Luis", "Supercines")])
+
+        def explode_on_second(title: str) -> object:
+            if title == "Toy Story 5":
+                return _tmdb_result()
+            raise RuntimeError("TMDB exploded")
+
+        with patch("app.tmdb.search_movie", side_effect=explode_on_second):
+            with pytest.raises(RuntimeError):
+                enrich_movies_with_tmdb(bare_db)
+
+        enriched = bare_db.execute(select(MovieModel).where(MovieModel.title == "Toy Story 5")).scalar_one()
+        assert enriched.tmdb_id == 862
 
 
 class TestDeleteAllScreenings:

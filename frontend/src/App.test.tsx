@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App, { ScreeningItem } from "./App";
 
 // Compute today/tomorrow in Ecuador time so tests stay date-independent.
@@ -74,15 +74,28 @@ describe("App", () => {
   it("renders today's movies after a successful fetch", async () => {
     mockFetch([BASE_SCREENING]);
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Toy Story 5")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
   });
 
   it("excludes screenings from other days", async () => {
-    const todayScreening = { ...BASE_SCREENING, id: 1, datetime: `${today}T14:30:00` };
-    const tomorrowScreening = { ...BASE_SCREENING, id: 2, datetime: `${tomorrow}T09:00:00`, movie: { title: "Supergirl" } };
+    const todayScreening = {
+      ...BASE_SCREENING,
+      id: 1,
+      datetime: `${today}T14:30:00`,
+    };
+    const tomorrowScreening = {
+      ...BASE_SCREENING,
+      id: 2,
+      datetime: `${tomorrow}T09:00:00`,
+      movie: { title: "Supergirl" },
+    };
     mockFetch([todayScreening, tomorrowScreening]);
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Toy Story 5")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
     expect(screen.queryByText("Supergirl")).not.toBeInTheDocument();
   });
 
@@ -91,14 +104,24 @@ describe("App", () => {
       ...BASE_SCREENING,
       id: 2,
       movie: { title: "Supergirl" },
-      complex: { ...BASE_COMPLEX, name: "San Luis", company: { name: "Supercines", base_url: "https://www.supercines.com" } },
+      complex: {
+        ...BASE_COMPLEX,
+        name: "San Luis",
+        company: { name: "Supercines", base_url: "https://www.supercines.com" },
+      },
     };
     mockFetch([BASE_SCREENING, supergirl]);
     render(<App />);
-    await waitFor(() => expect(screen.getByText("Toy Story 5")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
 
-    const titles = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(titles).toEqual([...titles].sort((a, b) => (a ?? "").localeCompare(b ?? "")));
+    const titles = screen
+      .getAllByRole("heading", { level: 3 })
+      .map((h) => h.textContent);
+    expect(titles).toEqual(
+      [...titles].sort((a, b) => (a ?? "").localeCompare(b ?? "")),
+    );
   });
 
   it("groups screenings under company–complex headings", async () => {
@@ -109,3 +132,107 @@ describe("App", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe("TMDB enrichment display", () => {
+  it("shows tmdb_title instead of raw title when available", async () => {
+    const enriched = {
+      ...BASE_SCREENING,
+      movie: {
+        title: "Toy Story Five",
+        tmdb_id: 862,
+        tmdb_title: "Toy Story 5",
+        poster_url: null,
+        overview: null,
+        runtime: null,
+        certification: null,
+        release_date: null,
+      },
+    };
+    mockFetch([enriched]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Toy Story Five")).not.toBeInTheDocument();
+  });
+
+  it("groups screenings with different raw titles but same tmdb_id into one card", async () => {
+    const multicines = {
+      ...BASE_SCREENING,
+      id: 1,
+      movie: {
+        title: "Toy Story Five",
+        tmdb_id: 862,
+        tmdb_title: "Toy Story 5",
+      },
+    };
+    const supercines = {
+      ...BASE_SCREENING,
+      id: 2,
+      complex: {
+        ...BASE_COMPLEX,
+        name: "San Luis",
+        company: { name: "Supercines", base_url: "https://www.supercines.com" },
+      },
+      movie: {
+        title: "Toy Story 5 (Doblada)",
+        tmdb_id: 862,
+        tmdb_title: "Toy Story 5",
+      },
+    };
+    mockFetch([multicines, supercines]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(1);
+  });
+
+  it("renders a poster image when poster_url is provided", async () => {
+    const enriched = {
+      ...BASE_SCREENING,
+      movie: {
+        title: "Toy Story 5",
+        tmdb_id: 862,
+        tmdb_title: "Toy Story 5",
+        poster_url: "https://image.tmdb.org/t/p/w500/poster.jpg",
+        overview: null,
+        runtime: null,
+        certification: null,
+        release_date: null,
+      },
+    };
+    mockFetch([enriched]);
+    render(<App />);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("img", { name: "Toy Story 5" }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("renders runtime and certification metadata when present", async () => {
+    const enriched = {
+      ...BASE_SCREENING,
+      movie: {
+        title: "Toy Story 5",
+        tmdb_id: 862,
+        tmdb_title: "Toy Story 5",
+        poster_url: null,
+        overview: "Woody is back.",
+        runtime: 98,
+        certification: "PG",
+        release_date: "2026-06-20",
+      },
+    };
+    mockFetch([enriched]);
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("PG")).toBeInTheDocument());
+    expect(screen.getByText("98 min")).toBeInTheDocument();
+    expect(screen.getByText("2026")).toBeInTheDocument();
+    expect(screen.getByText("Woody is back.")).toBeInTheDocument();
+  });
+});
+
