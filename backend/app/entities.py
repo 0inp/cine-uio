@@ -31,8 +31,10 @@ class Movie:
 @dataclass
 class Screening:
     datetime: datetime
-    format: str
-    language: str
+    #: "2D", "4D"… — the projection format, harmonised across chains.
+    projection: str
+    #: "dubbed" | "subtitled", or None when the chain did not say.
+    audio: str | None
     complex: CinemaComplex
     movie: Movie
     id: int = 0

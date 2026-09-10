@@ -107,8 +107,8 @@ class _FlakyScraper(Scraper):
         return [
             Screening(
                 datetime=datetime(2026, 9, 9, 20, 0),
-                format="2D",
-                language="Doblada",
+                projection="2D",
+                audio="dubbed",
                 complex=complex,
                 movie=Movie(title="Some film"),
             )
@@ -178,8 +178,8 @@ class _BrowserlessScraper(Scraper):
         return [
             Screening(
                 datetime=datetime(2026, 9, 9, 20, 0),
-                format="2D",
-                language="Doblada",
+                projection="2D",
+                audio="dubbed",
                 complex=complex,
                 movie=Movie(title="Some film"),
             )

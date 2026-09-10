@@ -21,11 +21,15 @@ export interface Movie {
   release_date?: string | null;
 }
 
+/** Harmonised across chains: see backend app/screening_types.py. */
+export type Projection = string;
+export type Audio = "dubbed" | "subtitled" | null;
+
 export interface Screening {
   id: number;
   datetime: string;
-  format: string;
-  language: string;
+  projection: Projection;
+  audio: Audio;
   complex: CinemaComplex;
   movie: Movie;
 }

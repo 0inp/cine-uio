@@ -33,7 +33,7 @@ class TestGetScreenings:
 
     def test_screening_has_required_fields(self, client: TestClient) -> None:
         s = client.get("/api/screenings").json()[0]
-        assert {"id", "datetime", "format", "language", "movie", "complex"} <= s.keys()
+        assert {"id", "datetime", "projection", "audio", "movie", "complex"} <= s.keys()
         assert "title" in s["movie"]
         assert "name" in s["complex"]
         assert "company" in s["complex"]
@@ -60,6 +60,13 @@ class TestGetScreenings:
     def test_complex_exposes_its_city(self, client: TestClient) -> None:
         complex_ = client.get("/api/screenings").json()[0]["complex"]
         assert complex_["city"] == "Quito"
+
+    def test_screening_types_are_harmonised(self, client: TestClient) -> None:
+        # Not the chains' raw vocabulary: "2D ESP", "SALA NORMAL Y VIP" and
+        # "Doblada" all have to arrive as the same two comparable dimensions.
+        screenings = client.get("/api/screenings").json()
+        assert {s["projection"] for s in screenings} <= {"2D", "3D", "4D"}
+        assert {s["audio"] for s in screenings} <= {"dubbed", "subtitled", None}
 
     def test_lists_cities(self, client: TestClient) -> None:
         assert client.get("/api/cities").json() == ["Quito"]

@@ -11,6 +11,7 @@ from app.entities import CinemaComplex, Movie, Screening
 from app.logging import logger
 from app.scrapers.base import Scraper
 from app.scrapers.fetching import fetch_json_all
+from app.screening_types import parse_audio, parse_projection
 
 # Supercines serves a different page to an unidentified client.
 _USER_AGENT = "Mozilla/5.0 (compatible; cine-uio/1.0)"
@@ -24,10 +25,10 @@ def _parse_day(payload: Any, day: date, complex: CinemaComplex, movie: Movie) ->
     content = (payload or {}).get("content") or {}
     screenings: list[Screening] = []
     for tecnology in content.get("tecnologies") or []:
+        # Supercines writes "2D Doblada": projection then audio, in one string.
         label: str = tecnology.get("tecnology", "")
-        parts = label.rsplit(" ", 1)
-        screening_format = parts[0] if len(parts) > 1 else label
-        screening_language = parts[1] if len(parts) > 1 else ""
+        projection = parse_projection(label)
+        audio = parse_audio(label)
         for schedule in tecnology.get("schedules", []):
             start = str(schedule.get("time", ""))
             if not start:
@@ -35,8 +36,8 @@ def _parse_day(payload: Any, day: date, complex: CinemaComplex, movie: Movie) ->
             screenings.append(
                 Screening(
                     datetime=datetime.strptime(f"{day:%Y-%m-%d} {start}", "%Y-%m-%d %H:%M"),
-                    format=screening_format,
-                    language=screening_language,
+                    projection=projection,
+                    audio=audio,
                     complex=complex,
                     movie=movie,
                 )

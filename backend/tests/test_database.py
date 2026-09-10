@@ -29,15 +29,15 @@ def _make_screening(
     title: str,
     complex_name: str,
     company_name: str,
-    fmt: str = "2D",
-    language: str = "Doblada",
+    projection: str = "2D",
+    audio: str | None = "dubbed",
     dt: datetime | None = None,
 ) -> Screening:
     company = CinemaCompany(name=company_name, base_url="https://example.com")
     return Screening(
         datetime=dt or datetime(2026, 6, 25, 14, 30),
-        format=fmt,
-        language=language,
+        projection=projection,
+        audio=audio,
         complex=CinemaComplex(name=complex_name, url_part="/", company=company),
         movie=Movie(title=title),
     )
@@ -63,11 +63,11 @@ class TestSaveScreenings:
     def test_stores_format_and_language(self, bare_db: Session) -> None:
         save_screenings(
             bare_db,
-            [_make_screening("Bleach", "CCI", "Multicines", fmt="IMAX 3D", language="Subtitulada")],
+            [_make_screening("Bleach", "CCI", "Multicines", projection="3D", audio="subtitled")],
         )
         result = get_all_screenings(bare_db)[0]
-        assert result.format == "IMAX 3D"
-        assert result.language == "Subtitulada"
+        assert result.projection == "3D"
+        assert result.audio == "subtitled"
 
     def test_raises_for_unknown_complex(self, bare_db: Session) -> None:
         with pytest.raises(ValueError, match="Complex NotAComplex"):

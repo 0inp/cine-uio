@@ -1,4 +1,4 @@
-import type { Movie, MovieGroup, Screening } from "./types";
+import type { Audio, Movie, MovieGroup, Screening } from "./types";
 
 /** Identity for grouping: the same film billed under two titles is one film. */
 export function movieKey(movie: Movie): string {
@@ -75,4 +75,14 @@ export function groupByMovie(screenings: Screening[]): MovieGroup[] {
   return Array.from(groups.values()).sort((a, b) =>
     displayTitle(a.movie).localeCompare(displayTitle(b.movie)),
   );
+}
+
+const AUDIO_LABELS: Record<string, string> = {
+  dubbed: "Doblada",
+  subtitled: "Subtitulada",
+};
+
+/** The reader's word for an audio track, or null when the chain did not say. */
+export function audioLabel(audio: Audio): string | null {
+  return audio === null ? null : (AUDIO_LABELS[audio] ?? null);
 }

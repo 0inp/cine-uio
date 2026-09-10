@@ -1,3 +1,4 @@
+import { audioLabel } from "../cartelera";
 import type { Screening } from "../types";
 
 interface ScreeningItemProps {
@@ -13,8 +14,12 @@ export function ScreeningItem({ screening }: ScreeningItemProps) {
           minute: "2-digit",
         })}
       </span>
-      <span className="screening-format">{screening.format}</span>
-      <span className="screening-language">{screening.language}</span>
+      <span className="screening-format">{screening.projection}</span>
+      {audioLabel(screening.audio) && (
+        <span className="screening-language">
+          {audioLabel(screening.audio)}
+        </span>
+      )}
     </div>
   );
 }
