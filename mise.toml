@@ -76,6 +76,11 @@ depends = ["backend_test", "frontend_test"]
 description = "API with autoreload"
 run = "uv run uvicorn app.api:app --reload"
 dir = "{{cwd}}/backend"
+# In development the SPA belongs to Vite on :5173. Left to itself the API would
+# also serve frontend/dist on :8000, so a build left over from any earlier day
+# would answer there — same app, same styling, older code — with nothing on the
+# page to say so. Better that :8000 has no frontend at all than a plausible one.
+env = { CINE_UIO_SERVE_FRONTEND = "0" }
 
 [tasks.dev_frontend]
 description = "Vite dev server"

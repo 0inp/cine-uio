@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.database import get_all_cities, get_all_screenings, get_db  # noqa: E402
+from app.logging import logger  # noqa: E402
 from app.observability import current_health  # noqa: E402
 from app.schemas import HealthSchema, ScreeningSchema  # noqa: E402
 
@@ -54,6 +56,15 @@ def get_health(db: Session = Depends(get_db)) -> HealthSchema:
     return HealthSchema.model_validate(current_health(db))
 
 
+SERVE_FRONTEND_ENV_VAR = "CINE_UIO_SERVE_FRONTEND"
+_OFF = {"0", "false", "no"}
+
+
+def _serving_is_switched_off() -> bool:
+    """Default to serving: production must not depend on a variable being set."""
+    return os.environ.get(SERVE_FRONTEND_ENV_VAR, "1").strip().lower() in _OFF
+
+
 def mount_frontend(app: FastAPI, dist_dir: Path) -> bool:
     """Serve the built SPA from the same origin as the API, if it has been built.
 
@@ -61,11 +72,24 @@ def mount_frontend(app: FastAPI, dist_dir: Path) -> bool:
     keeps working whatever hostname it is reached through — VITE_API_URL is the
     relative "/api". Mounted last so the API routes above match first.
 
-    Returns False when there is no build, which is the normal case in development:
-    Vite then serves the frontend on its own port and CORS applies.
+    Returns False when there is no build, or when serving is switched off. A build
+    is a snapshot taken at some point in the past and nothing about the page it
+    renders says how old it is, so the two ways of ending up with a stale one are
+    closed here: development opts out of serving entirely, and a mount that does
+    happen announces the build's date.
     """
-    if not (dist_dir / "index.html").is_file():
+    index = dist_dir / "index.html"
+
+    if _serving_is_switched_off():
+        if index.is_file():
+            logger.info(f"Not serving {dist_dir}: {SERVE_FRONTEND_ENV_VAR} is off (the SPA is Vite's job in dev)")
         return False
+
+    if not index.is_file():
+        return False
+
+    built = datetime.fromtimestamp(index.stat().st_mtime)
+    logger.info(f"Serving the SPA from {dist_dir}, built {built:%Y-%m-%d %H:%M}")
     app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
     return True
 

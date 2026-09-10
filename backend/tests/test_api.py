@@ -1,3 +1,5 @@
+import logging
+import os
 from collections.abc import Generator
 from pathlib import Path
 
@@ -6,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.api import app, mount_frontend
+from app.api import SERVE_FRONTEND_ENV_VAR, app, mount_frontend
 from app.database import get_db
 
 
@@ -127,3 +129,38 @@ class TestFrontendMount:
     def test_does_nothing_without_a_build(self, tmp_path: Path) -> None:
         # Normal in development: Vite serves the frontend on its own port.
         assert mount_frontend(FastAPI(), tmp_path) is False
+
+    def test_can_be_switched_off_even_when_a_build_exists(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # `mise run dev` sets this. Without it, uvicorn on :8000 quietly serves
+        # whatever stale dist happens to be on disk while Vite serves the real
+        # frontend on :5173 — two ports showing the same app, one of them months old.
+        monkeypatch.setenv(SERVE_FRONTEND_ENV_VAR, "0")
+        assert mount_frontend(FastAPI(), self._dist(tmp_path)) is False
+
+    def test_serves_the_build_by_default(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Production must not need the variable to be set: leaving it unset serves.
+        monkeypatch.delenv(SERVE_FRONTEND_ENV_VAR, raising=False)
+        assert mount_frontend(FastAPI(), self._dist(tmp_path)) is True
+
+    def test_says_when_the_build_is_from(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A stale build is invisible from the browser, so the boot log is the one
+        # place it can be caught. Naming the date is the whole point of the line.
+        monkeypatch.delenv(SERVE_FRONTEND_ENV_VAR, raising=False)
+        dist = self._dist(tmp_path)
+        os.utime(dist / "index.html", (1_757_000_000, 1_757_000_000))
+        with caplog.at_level(logging.INFO, logger="cine-uio"):
+            mount_frontend(FastAPI(), dist)
+        assert "2025-09-04" in caplog.text
+
+    def test_explains_itself_when_switched_off_over_a_real_build(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Otherwise `/` returning 404 next to a perfectly good dist looks like a bug.
+        monkeypatch.setenv(SERVE_FRONTEND_ENV_VAR, "0")
+        with caplog.at_level(logging.INFO, logger="cine-uio"):
+            mount_frontend(FastAPI(), self._dist(tmp_path))
+        assert SERVE_FRONTEND_ENV_VAR in caplog.text
