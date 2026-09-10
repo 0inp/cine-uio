@@ -22,8 +22,8 @@ const BASE_COMPLEX = {
 const BASE_SCREENING = {
   id: 1,
   datetime: `${today}T14:30:00`,
-  format: "2D",
-  language: "Doblada",
+  projection: "2D",
+  audio: "dubbed" as const,
   complex: BASE_COMPLEX,
   movie: { title: "Toy Story 5" },
 };
@@ -90,6 +90,12 @@ describe("ScreeningItem", () => {
     render(<ScreeningItem screening={BASE_SCREENING} />);
     expect(screen.getByText("2D")).toBeInTheDocument();
     expect(screen.getByText("Doblada")).toBeInTheDocument();
+  });
+
+  it("omits the audio when the chain did not say", () => {
+    render(<ScreeningItem screening={{ ...BASE_SCREENING, audio: null }} />);
+    expect(screen.getByText("2D")).toBeInTheDocument();
+    expect(screen.queryByText("Doblada")).not.toBeInTheDocument();
   });
 
   it("renders a time string", () => {

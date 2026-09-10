@@ -47,8 +47,8 @@ class ScreeningSchema(BaseModel):
 
     id: int
     datetime: datetime
-    format: str
-    language: str
+    projection: str
+    audio: str | None
     complex: CinemaComplexSchema
     movie: MovieSchema
 

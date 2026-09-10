@@ -59,8 +59,8 @@ class Screening(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     datetime: Mapped[_dt.datetime] = mapped_column()
-    format: Mapped[str] = mapped_column(String)
-    language: Mapped[str] = mapped_column(String)
+    projection: Mapped[str] = mapped_column(String)
+    audio: Mapped[str | None] = mapped_column(String, nullable=True)
     complex_id: Mapped[int] = mapped_column(ForeignKey("cinema_complexes.id"))
     movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id"))
 

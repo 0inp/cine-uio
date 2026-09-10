@@ -72,15 +72,15 @@ def seeded_db(bare_db: Session) -> Session:
         [
             ScreeningModel(
                 datetime=datetime(2026, 6, 25, 14, 30),
-                format="2D",
-                language="Doblada",
+                projection="2D",
+                audio="dubbed",
                 complex_id=cci_id,
                 movie_id=movie1.id,
             ),
             ScreeningModel(
                 datetime=datetime(2026, 6, 25, 20, 0),
-                format="3D",
-                language="Subtitulada",
+                projection="3D",
+                audio="subtitled",
                 complex_id=san_luis_id,
                 movie_id=movie2.id,
             ),

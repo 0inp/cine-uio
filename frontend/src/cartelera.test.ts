@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  audioLabel,
   displayTitle,
   groupByMovie,
   movieKey,
@@ -24,8 +25,8 @@ function screening(
   return {
     id: overrides.id ?? 1,
     datetime: `${day}T20:00:00`,
-    format: "2D",
-    language: "Doblada",
+    projection: "2D",
+    audio: "dubbed" as const,
     complex: {
       name: overrides.venue ?? "CCI",
       city: "Quito",
@@ -160,5 +161,16 @@ describe("groupByMovie", () => {
 
   it("returns nothing for no screenings", () => {
     expect(groupByMovie([])).toEqual([]);
+  });
+});
+
+describe("audioLabel", () => {
+  it("gives the reader Spanish, not the stored code", () => {
+    expect(audioLabel("dubbed")).toBe("Doblada");
+    expect(audioLabel("subtitled")).toBe("Subtitulada");
+  });
+
+  it("says nothing when the chain did not say", () => {
+    expect(audioLabel(null)).toBeNull();
   });
 });

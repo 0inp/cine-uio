@@ -14,8 +14,8 @@ def _screening(title: str, complex_name: str, company_name: str) -> Screening:
     company = CinemaCompany(name=company_name, base_url="https://example.com")
     return Screening(
         datetime=datetime(2026, 9, 9, 14, 30),
-        format="2D",
-        language="Doblada",
+        projection="2D",
+        audio="dubbed",
         complex=CinemaComplex(name=complex_name, url_part="/", company=company),
         movie=Movie(title=title),
     )

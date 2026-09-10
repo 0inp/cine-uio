@@ -138,8 +138,8 @@ def get_all_screenings(
         Screening(
             id=s.id,
             datetime=s.datetime,
-            format=s.format,
-            language=s.language,
+            projection=s.projection,
+            audio=s.audio,
             complex=complexes[s.complex.id],
             movie=movies[s.movie.id],
         )
@@ -215,8 +215,8 @@ def _insert_screenings(db: Session, screenings: list[Screening]) -> None:
         db.add(
             ScreeningModel(
                 datetime=screening.datetime,
-                format=screening.format,
-                language=screening.language,
+                projection=screening.projection,
+                audio=screening.audio,
                 complex_id=complex_ids[complex_key],
                 movie_id=movie_ids[title],
             )

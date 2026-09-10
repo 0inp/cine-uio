@@ -11,6 +11,7 @@ from app.entities import CinemaComplex, Movie, Screening
 from app.logging import logger
 from app.scrapers.base import Scraper
 from app.scrapers.fetching import fetch_json_all
+from app.screening_types import parse_audio, parse_projection
 
 
 class ScreeningsResponseDict(TypedDict):
@@ -47,15 +48,18 @@ def _day_bounds(first: date, days: int) -> tuple[str, str]:
 def _parse_sessions(payload: list[ScreeningsResponseDict], complex: CinemaComplex, movie: Movie) -> list[Screening]:
     screenings: list[Screening] = []
     for entry in payload:
-        language: str = entry["name"]
+        # Multicines puts the projection *and* the audio here ("2D ESP"), and the
+        # room type in theaterTypes — which we do not keep.
+        raw_kind: str = entry["name"]
+        audio = parse_audio(raw_kind)
         for theater_type in entry["theaterTypes"]:
-            screening_format: str = theater_type["name"]
+            projection = parse_projection(raw_kind, theater_type["name"])
             for session in theater_type["sessions"]:
                 screenings.append(
                     Screening(
                         datetime=datetime.fromisoformat(session["showtime"]),
-                        format=screening_format,
-                        language=language,
+                        projection=projection,
+                        audio=audio,
                         complex=complex,
                         movie=movie,
                     )
