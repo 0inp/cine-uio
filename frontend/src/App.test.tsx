@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ScreeningItem } from "./components/ScreeningItem";
@@ -550,7 +556,9 @@ describe("day picker", () => {
     await waitFor(() =>
       expect(screen.getByRole("group", { name: "Día" })).toBeInTheDocument(),
     );
-    expect(screen.getAllByRole("button")).toHaveLength(2);
+    // Scoped to the picker: the page has other buttons that are none of its business.
+    const picker = screen.getByRole("group", { name: "Día" });
+    expect(within(picker).getAllByRole("button")).toHaveLength(2);
   });
 
   it("starts on today and shows only today", async () => {
@@ -573,7 +581,8 @@ describe("day picker", () => {
       expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
     );
 
-    const notToday = screen
+    const picker = screen.getByRole("group", { name: "Día" });
+    const notToday = within(picker)
       .getAllByRole("button")
       .find((b) => b.textContent !== "Hoy");
     fireEvent.click(notToday as HTMLElement);
@@ -648,6 +657,77 @@ describe("venue filter", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ver todos" }));
     await waitFor(() =>
       expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("theme", () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute("data-theme");
+  });
+
+  it("starts light when the system asks for nothing", async () => {
+    // jsdom has no matchMedia, which is the same situation as an old browser.
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("follows a dark system preference", async () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: true })),
+    );
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(document.documentElement.dataset.theme).toBe("dark"),
+    );
+  });
+
+  it("flips when the reader asks", async () => {
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByLabelText("Cambiar a tema oscuro"));
+
+    await waitFor(() =>
+      expect(document.documentElement.dataset.theme).toBe("dark"),
+    );
+    expect(screen.getByLabelText("Cambiar a tema claro")).toBeInTheDocument();
+  });
+
+  it("remembers the choice", async () => {
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByLabelText("Cambiar a tema oscuro"));
+    await waitFor(() =>
+      expect(localStorage.getItem("cine-uio.theme")).toBe("dark"),
+    );
+  });
+
+  it("an explicit choice wins over a dark system", async () => {
+    // The reason the stylesheet guards its media query on :not([data-theme="light"]).
+    localStorage.setItem("cine-uio.theme", "light");
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: true })),
+    );
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(document.documentElement.dataset.theme).toBe("light"),
     );
   });
 });

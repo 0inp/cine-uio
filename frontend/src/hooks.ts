@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { fetchCities, fetchHealth, fetchScreenings } from "./api";
 import type { Health, Screening } from "./types";
 
+export type Theme = "light" | "dark";
+
+const THEME_STORAGE_KEY = "cine-uio.theme";
 const DEFAULT_CITY = "Quito";
 const CITY_STORAGE_KEY = "cine-uio.city";
 
@@ -85,4 +88,51 @@ export function useCartelera(city: string): CarteleraState {
   }, [city]);
 
   return { screenings, loading, error };
+}
+
+function systemTheme(): Theme {
+  // jsdom and older browsers have no matchMedia; light is the safer assumption
+  // because the stylesheet's base palette is the light one.
+  if (typeof window === "undefined" || !window.matchMedia) return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function storedTheme(): Theme | null {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return stored === "light" || stored === "dark" ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The active theme and a way to flip it.
+ *
+ * Starts from the reader's system preference and only departs from it once they
+ * ask: an explicit choice is remembered and wins over the system from then on.
+ */
+export function useTheme(): [Theme, () => void] {
+  const [theme, setTheme] = useState<Theme>(
+    () => storedTheme() ?? systemTheme(),
+  );
+
+  useEffect(() => {
+    // The stylesheet keys off this attribute; nothing else needs to know.
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, next);
+    } catch {
+      // Private browsing: the choice applies now but does not persist.
+    }
+  };
+
+  return [theme, toggleTheme];
 }

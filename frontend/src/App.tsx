@@ -13,11 +13,19 @@ import { CityPicker } from "./components/CityPicker";
 import { DayPicker } from "./components/DayPicker";
 import { HealthBanner } from "./components/HealthBanner";
 import { MovieCard } from "./components/MovieCard";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { VenueFilter } from "./components/VenueFilter";
-import { useCartelera, useCities, useCityPreference, useHealth } from "./hooks";
+import {
+  useCartelera,
+  useCities,
+  useCityPreference,
+  useHealth,
+  useTheme,
+} from "./hooks";
 
 function App() {
   const [city, selectCity] = useCityPreference();
+  const [theme, toggleTheme] = useTheme();
   const cities = useCities();
   const health = useHealth();
   const { screenings, loading, error } = useCartelera(city);
@@ -57,7 +65,10 @@ function App() {
 
   return (
     <div className="app">
-      <h1 className="title">Cine UIO</h1>
+      <header className="app-header">
+        <h1 className="title">Cine UIO</h1>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </header>
       <HealthBanner health={health} />
       <CityPicker cities={cities} city={city} onSelect={selectCity} />
       <DayPicker days={days} day={day} today={today} onSelect={setChosenDay} />
