@@ -57,3 +57,4 @@ The daily refresh is a launchd agent: `./ops/install-scrape-agent.sh`.
 | `ALLOWED_ORIGINS`        | `http://localhost:5173`     | backend CORS                |
 | `TMDB_READ_ACCESS_TOKEN` | *(required)*                | backend — TMDB Bearer token |
 | `SCRAPE_WEBHOOK_URL`     | *(optional)*                | backend — Slack/Discord webhook for scrape failures |
+| `CINE_UIO_SERVE_FRONTEND`| `1`                         | backend — set to `0` to keep the API from serving `frontend/dist` (set by `mise run dev`, so :8000 cannot answer with a stale build) |
