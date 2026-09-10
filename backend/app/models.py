@@ -29,6 +29,9 @@ class CinemaComplex(Base):
     name: Mapped[str] = mapped_column(String)
     city: Mapped[str] = mapped_column(String, index=True)
     url_part: Mapped[str] = mapped_column(String)
+    #: Both chains publish these; nullable so a future one that does not still fits.
+    latitude: Mapped[float | None] = mapped_column(nullable=True)
+    longitude: Mapped[float | None] = mapped_column(nullable=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("cinema_companies.id"))
 
     company: Mapped[CinemaCompany] = relationship(back_populates="complexes")

@@ -7,7 +7,14 @@ export interface CinemaComplex {
   name: string;
   city: string;
   url_part: string;
+  latitude?: number | null;
+  longitude?: number | null;
   company: CinemaCompany;
+}
+
+export interface Position {
+  latitude: number;
+  longitude: number;
 }
 
 export interface Movie {

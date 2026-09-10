@@ -5,7 +5,9 @@ import {
   availableVenues,
   defaultDay,
   displayTitle,
+  distanceKm,
   filterScreenings,
+  formatDistance,
   groupByMovie,
   movieKey,
   todayInEcuador,
@@ -24,6 +26,8 @@ function screening(
     venue?: string;
     company?: string;
     id?: number;
+    latitude?: number | null;
+    longitude?: number | null;
   } = {},
 ): Screening {
   return {
@@ -35,6 +39,10 @@ function screening(
       name: overrides.venue ?? "CCI",
       city: "Quito",
       url_part: "/x",
+      latitude:
+        overrides.latitude === undefined ? -0.17737 : overrides.latitude,
+      longitude:
+        overrides.longitude === undefined ? -78.48497 : overrides.longitude,
       company: {
         name: overrides.company ?? "Multicines",
         base_url: "https://x",
@@ -252,5 +260,89 @@ describe("audioLabel", () => {
 
   it("says nothing when the chain did not say", () => {
     expect(audioLabel(null)).toBeNull();
+  });
+});
+
+const QUITO = { latitude: -0.1807, longitude: -78.4678 };
+const GUAYAQUIL = { latitude: -2.1894, longitude: -79.8891 };
+
+describe("distanceKm", () => {
+  it("matches a known distance", () => {
+    // Quito to Guayaquil is about 270 km as the crow flies.
+    expect(distanceKm(QUITO, GUAYAQUIL)).toBeGreaterThan(260);
+    expect(distanceKm(QUITO, GUAYAQUIL)).toBeLessThan(285);
+  });
+
+  it("is zero for the same place", () => {
+    expect(distanceKm(QUITO, QUITO)).toBeCloseTo(0, 6);
+  });
+
+  it("does not care about direction", () => {
+    expect(distanceKm(QUITO, GUAYAQUIL)).toBeCloseTo(
+      distanceKm(GUAYAQUIL, QUITO),
+      9,
+    );
+  });
+
+  it("would notice swapped coordinates", () => {
+    // The classic bug: reading lat as lon puts Quito in the wrong hemisphere.
+    const swapped = { latitude: QUITO.longitude, longitude: QUITO.latitude };
+    expect(distanceKm(QUITO, swapped)).toBeGreaterThan(1000);
+  });
+});
+
+describe("formatDistance", () => {
+  it("uses metres below a kilometre, where the difference matters", () => {
+    expect(formatDistance(0.842)).toBe("842 m");
+  });
+
+  it("uses kilometres above one, with a comma", () => {
+    expect(formatDistance(3.47)).toBe("3,5 km");
+  });
+});
+
+describe("availableVenues with a position", () => {
+  const near = screening("2026-09-10", {
+    id: 1,
+    venue: "Near",
+    latitude: -0.181,
+    longitude: -78.468,
+  });
+  const far = screening("2026-09-10", {
+    id: 2,
+    venue: "Far",
+    latitude: GUAYAQUIL.latitude,
+    longitude: GUAYAQUIL.longitude,
+  });
+
+  it("orders by proximity once a position is known", () => {
+    const venues = availableVenues([far, near], QUITO);
+    expect(venues.map((v) => v.key)).toEqual([
+      "Multicines - Near",
+      "Multicines - Far",
+    ]);
+  });
+
+  it("keeps alphabetical order without a position", () => {
+    const venues = availableVenues([near, far]);
+    expect(venues.map((v) => v.key)).toEqual([
+      "Multicines - Far",
+      "Multicines - Near",
+    ]);
+  });
+
+  it("puts a venue with no coordinates last rather than dropping it", () => {
+    const unknown = screening("2026-09-10", {
+      id: 3,
+      venue: "Unknown",
+      latitude: null,
+      longitude: null,
+    });
+    const venues = availableVenues([unknown, near], QUITO);
+    expect(venues.map((v) => v.key)).toEqual([
+      "Multicines - Near",
+      "Multicines - Unknown",
+    ]);
+    expect(venues[1].distanceKm).toBeUndefined();
   });
 });

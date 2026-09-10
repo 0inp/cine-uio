@@ -131,6 +131,8 @@ def get_all_screenings(
                 name=s.complex.name,
                 city=s.complex.city,
                 url_part=s.complex.url_part,
+                latitude=s.complex.latitude,
+                longitude=s.complex.longitude,
                 company=companies[s.complex.company.id],
             )
 
@@ -172,6 +174,8 @@ def get_all_cinema_complexes_from_cinema_company(db: Session, cinema_company_nam
             name=orm_complex.name,
             city=orm_complex.city,
             url_part=orm_complex.url_part,
+            latitude=orm_complex.latitude,
+            longitude=orm_complex.longitude,
             company=CinemaCompany(
                 name=orm_complex.company.name,
                 base_url=orm_complex.company.base_url,

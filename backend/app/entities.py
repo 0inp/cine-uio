@@ -14,6 +14,8 @@ class CinemaComplex:
     url_part: str
     company: CinemaCompany
     city: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 @dataclass

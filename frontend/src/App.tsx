@@ -8,17 +8,20 @@ import {
   groupByMovie,
   movieKey,
   todayInEcuador,
+  venueDistances,
 } from "./cartelera";
 import { CityPicker } from "./components/CityPicker";
 import { DayPicker } from "./components/DayPicker";
 import { HealthBanner } from "./components/HealthBanner";
 import { MovieCard } from "./components/MovieCard";
+import { NearbyButton } from "./components/NearbyButton";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { VenueFilter } from "./components/VenueFilter";
 import {
   useCartelera,
   useCities,
   useCityPreference,
+  useGeolocation,
   useHealth,
   useTheme,
 } from "./hooks";
@@ -29,6 +32,7 @@ function App() {
   const cities = useCities();
   const health = useHealth();
   const { screenings, loading, error } = useCartelera(city);
+  const geolocation = useGeolocation();
 
   const [chosenDay, setChosenDay] = useState<string | null>(null);
   const [chosenVenues, setChosenVenues] = useState<string[]>([]);
@@ -36,7 +40,11 @@ function App() {
   const today = todayInEcuador();
   const all = useMemo(() => screenings ?? [], [screenings]);
   const days = useMemo(() => availableDays(all, today), [all, today]);
-  const venues = useMemo(() => availableVenues(all), [all]);
+  const venues = useMemo(
+    () => availableVenues(all, geolocation.position),
+    [all, geolocation.position],
+  );
+  const distances = useMemo(() => venueDistances(venues), [venues]);
 
   // Derived rather than reset in an effect: changing city can leave a day or a
   // venue that no longer exists selected, and the fallback handles it in one place.
@@ -77,6 +85,7 @@ function App() {
         selected={chosenVenues}
         onChange={setChosenVenues}
       />
+      <NearbyButton {...geolocation} />
       {day !== null && day !== today && (
         <p className="date-notice">
           Sin funciones para hoy —{" "}
@@ -91,7 +100,11 @@ function App() {
         <p className="empty-notice">No hay funciones disponibles</p>
       )}
       {groups.map((group) => (
-        <MovieCard key={movieKey(group.movie)} group={group} />
+        <MovieCard
+          key={movieKey(group.movie)}
+          group={group}
+          distances={distances}
+        />
       ))}
     </div>
   );

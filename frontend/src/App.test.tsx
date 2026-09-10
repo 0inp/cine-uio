@@ -21,6 +21,8 @@ const tomorrow = ecuadorDate(1);
 const BASE_COMPLEX = {
   name: "CCI",
   city: "Quito",
+  latitude: -0.17737,
+  longitude: -78.48497,
   url_part: "/?cityId=19&storeId=3555",
   company: { name: "Multicines", base_url: "https://www.multicines.com.ec" },
 };
@@ -729,5 +731,91 @@ describe("theme", () => {
     await waitFor(() =>
       expect(document.documentElement.dataset.theme).toBe("light"),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("nearby venues", () => {
+  function stubGeolocation(
+    behaviour: "grant" | "deny",
+    coords = { latitude: -0.1807, longitude: -78.4678 },
+  ) {
+    const getCurrentPosition = vi.fn(
+      (onSuccess: (p: unknown) => void, onError: () => void) => {
+        if (behaviour === "grant") onSuccess({ coords });
+        else onError();
+      },
+    );
+    vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+    return getCurrentPosition;
+  }
+
+  it("never asks for a position on its own", async () => {
+    // An unprompted location dialog is one people dismiss reflexively, and a
+    // dismissed prompt is hard to undo.
+    const getCurrentPosition = stubGeolocation("grant");
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(getCurrentPosition).not.toHaveBeenCalled();
+  });
+
+  it("asks only when the reader does", async () => {
+    const getCurrentPosition = stubGeolocation("grant");
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText(/Cines cerca de mí/)).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByText(/Cines cerca de mí/));
+    expect(getCurrentPosition).toHaveBeenCalledOnce();
+  });
+
+  it("shows the distance to a venue once the position is known", async () => {
+    stubGeolocation("grant");
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText(/Cines cerca de mí/)).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByText(/Cines cerca de mí/));
+
+    // BASE_COMPLEX sits a few hundred metres from the stubbed position.
+    await waitFor(() =>
+      expect(screen.getByText(/\d+ m|\d+,\d+ km/)).toBeInTheDocument(),
+    );
+  });
+
+  it("carries on without distances when the request is refused", async () => {
+    stubGeolocation("deny");
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText(/Cines cerca de mí/)).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByText(/Cines cerca de mí/));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/No se pudo obtener tu ubicación/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Toy Story 5")).toBeInTheDocument();
+  });
+
+  it("offers nothing where geolocation does not exist", async () => {
+    vi.stubGlobal("navigator", {});
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/Cines cerca de mí/)).not.toBeInTheDocument();
   });
 });

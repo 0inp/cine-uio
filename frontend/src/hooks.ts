@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchCities, fetchHealth, fetchScreenings } from "./api";
-import type { Health, Screening } from "./types";
+import type { Health, Position, Screening } from "./types";
 
 export type Theme = "light" | "dark";
 
@@ -135,4 +135,49 @@ export function useTheme(): [Theme, () => void] {
   };
 
   return [theme, toggleTheme];
+}
+
+export type GeolocationStatus = "idle" | "asking" | "granted" | "denied";
+
+export interface GeolocationState {
+  position: Position | null;
+  status: GeolocationStatus;
+  request: () => void;
+  available: boolean;
+}
+
+/**
+ * The reader's position, only ever after they ask for it.
+ *
+ * Nothing is requested on load: a page that pops a location prompt before being
+ * asked is one people dismiss reflexively, and a dismissed prompt is hard to undo.
+ */
+export function useGeolocation(): GeolocationState {
+  const [position, setPosition] = useState<Position | null>(null);
+  const [status, setStatus] = useState<GeolocationStatus>("idle");
+
+  const available =
+    typeof navigator !== "undefined" && navigator.geolocation !== undefined;
+
+  const request = () => {
+    if (!available) return;
+    setStatus("asking");
+    navigator.geolocation.getCurrentPosition(
+      (result) => {
+        setPosition({
+          latitude: result.coords.latitude,
+          longitude: result.coords.longitude,
+        });
+        setStatus("granted");
+      },
+      () => {
+        // Refused, unavailable, or timed out — all the same to the page: it
+        // carries on without distances.
+        setStatus("denied");
+      },
+      { timeout: 10_000, maximumAge: 5 * 60_000 },
+    );
+  };
+
+  return { position, status, request, available };
 }
