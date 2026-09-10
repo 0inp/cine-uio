@@ -1,12 +1,14 @@
-import { displayTitle } from "../cartelera";
+import { displayTitle, formatDistance } from "../cartelera";
 import type { MovieGroup } from "../types";
 import { ScreeningItem } from "./ScreeningItem";
 
 interface MovieCardProps {
   group: MovieGroup;
+  /** Venue key to distance in km, when the reader has shared a position. */
+  distances?: Record<string, number>;
 }
 
-export function MovieCard({ group }: MovieCardProps) {
+export function MovieCard({ group, distances = {} }: MovieCardProps) {
   const { movie, screeningsByVenue } = group;
   const title = displayTitle(movie);
   const releaseYear = movie.release_date?.slice(0, 4);
@@ -34,7 +36,14 @@ export function MovieCard({ group }: MovieCardProps) {
       <div className="movie-venues">
         {Object.entries(screeningsByVenue).map(([venueKey, screenings]) => (
           <div key={venueKey} className="company-complex-section">
-            <h4 className="company-complex-name">{venueKey}</h4>
+            <h4 className="company-complex-name">
+              {venueKey}
+              {distances[venueKey] !== undefined && (
+                <span className="venue-distance">
+                  {formatDistance(distances[venueKey])}
+                </span>
+              )}
+            </h4>
             <div className="screenings-list">
               {screenings.map((screening) => (
                 <ScreeningItem key={screening.id} screening={screening} />

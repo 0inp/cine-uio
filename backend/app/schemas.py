@@ -19,6 +19,8 @@ class CinemaComplexSchema(BaseModel):
     name: str
     city: str
     url_part: str
+    latitude: float | None
+    longitude: float | None
     company: CinemaCompanySchema
 
 

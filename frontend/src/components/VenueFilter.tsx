@@ -1,4 +1,5 @@
 import type { Venue } from "../cartelera";
+import { formatDistance } from "../cartelera";
 
 interface VenueFilterProps {
   venues: Venue[];
@@ -36,6 +37,11 @@ export function VenueFilter({ venues, selected, onChange }: VenueFilterProps) {
               onChange={() => toggle(venue.key)}
             />
             {venue.label}
+            {venue.distanceKm !== undefined && (
+              <span className="venue-distance">
+                {formatDistance(venue.distanceKm)}
+              </span>
+            )}
           </label>
         ))}
       </div>
