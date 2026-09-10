@@ -60,6 +60,79 @@
   border-color: #c0392b;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.day-picker {
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.day-chip {
+  background: var(--social-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.day-chip-selected {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.venue-filter {
+  width: 95%;
+  margin: 0 auto 16px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.venue-filter summary {
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.venue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 0 6px 12px;
+}
+
+.venue-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.venue-clear {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 4px 0;
+  font-size: 0.85rem;
+}
+
 .city-picker {
   display: flex;
   align-items: center;

@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   audioLabel,
+  availableDays,
+  availableVenues,
+  defaultDay,
   displayTitle,
+  filterScreenings,
   groupByMovie,
   movieKey,
-  pickVisibleDay,
   todayInEcuador,
+  venueKeyOf,
 } from "./cartelera";
 import type { Movie, Screening } from "./types";
 
@@ -78,37 +82,113 @@ describe("todayInEcuador", () => {
   });
 });
 
-describe("pickVisibleDay", () => {
-  it("shows today when anything is on", () => {
-    const day = pickVisibleDay(
-      [screening("2026-09-09"), screening("2026-09-11", { id: 2 })],
-      "2026-09-09",
+describe("availableDays", () => {
+  it("offers each day once, in order", () => {
+    const days = availableDays(
+      [
+        screening("2026-09-12"),
+        screening("2026-09-10"),
+        screening("2026-09-10"),
+      ],
+      "2026-09-10",
     );
-    expect(day.displayDate).toBeNull();
-    expect(day.screenings).toHaveLength(1);
+    expect(days).toEqual(["2026-09-10", "2026-09-12"]);
   });
 
-  it("falls back to the nearest upcoming day", () => {
-    const day = pickVisibleDay(
-      [screening("2026-09-13", { id: 1 }), screening("2026-09-11", { id: 2 })],
-      "2026-09-09",
+  it("never offers a day that has passed", () => {
+    // Excluded here rather than in the picker, so nothing downstream can offer
+    // last week's showtimes from a stale database.
+    expect(availableDays([screening("2026-09-01")], "2026-09-10")).toEqual([]);
+  });
+
+  it("has nothing to offer for an empty payload", () => {
+    expect(availableDays([], "2026-09-10")).toEqual([]);
+  });
+});
+
+describe("defaultDay", () => {
+  it("starts on today when something is on", () => {
+    expect(defaultDay(["2026-09-10", "2026-09-11"], "2026-09-10")).toBe(
+      "2026-09-10",
     );
-    expect(day.displayDate).toBe("2026-09-11");
-    expect(day.screenings.map((s) => s.id)).toEqual([2]);
   });
 
-  it("never falls back to a past day", () => {
-    // A stale database must show nothing rather than last week's showtimes.
-    const day = pickVisibleDay([screening("2026-09-01")], "2026-09-09");
-    expect(day.displayDate).toBeNull();
-    expect(day.screenings).toEqual([]);
+  it("falls forward to the nearest day when today has nothing", () => {
+    expect(defaultDay(["2026-09-11", "2026-09-13"], "2026-09-10")).toBe(
+      "2026-09-11",
+    );
   });
 
-  it("handles an empty payload", () => {
-    expect(pickVisibleDay([], "2026-09-09")).toEqual({
-      displayDate: null,
-      screenings: [],
+  it("has no day to pick when there are none", () => {
+    expect(defaultDay([], "2026-09-10")).toBeNull();
+  });
+});
+
+describe("availableVenues", () => {
+  it("lists only the venues actually showing something", () => {
+    const venues = availableVenues([
+      screening("2026-09-10", { venue: "San Luis", company: "Supercines" }),
+      screening("2026-09-10", { venue: "CCI", company: "Multicines", id: 2 }),
+    ]);
+    expect(venues.map((v) => v.key)).toEqual([
+      "Multicines - CCI",
+      "Supercines - San Luis",
+    ]);
+  });
+
+  it("agrees with the key used for grouping", () => {
+    const one = screening("2026-09-10");
+    expect(availableVenues([one])[0].key).toBe(venueKeyOf(one));
+  });
+});
+
+describe("filterScreenings", () => {
+  const showings = [
+    screening("2026-09-10", { id: 1, venue: "CCI", company: "Multicines" }),
+    screening("2026-09-11", { id: 2, venue: "CCI", company: "Multicines" }),
+    screening("2026-09-10", {
+      id: 3,
+      venue: "San Luis",
+      company: "Supercines",
+    }),
+  ];
+
+  it("keeps a single day", () => {
+    const kept = filterScreenings(showings, {
+      day: "2026-09-11",
+      venueKeys: [],
     });
+    expect(kept.map((s) => s.id)).toEqual([2]);
+  });
+
+  it("keeps the chosen venues", () => {
+    const kept = filterScreenings(showings, {
+      day: null,
+      venueKeys: ["Supercines - San Luis"],
+    });
+    expect(kept.map((s) => s.id)).toEqual([3]);
+  });
+
+  it("keeps several venues at once", () => {
+    const kept = filterScreenings(showings, {
+      day: "2026-09-10",
+      venueKeys: ["Supercines - San Luis", "Multicines - CCI"],
+    });
+    expect(kept.map((s) => s.id)).toEqual([1, 3]);
+  });
+
+  it("treats an untouched venue filter as every venue", () => {
+    // Selecting nothing must not empty the page.
+    const kept = filterScreenings(showings, { day: null, venueKeys: [] });
+    expect(kept).toHaveLength(3);
+  });
+
+  it("combines both filters", () => {
+    const kept = filterScreenings(showings, {
+      day: "2026-09-10",
+      venueKeys: ["Multicines - CCI"],
+    });
+    expect(kept.map((s) => s.id)).toEqual([1]);
   });
 });
 
