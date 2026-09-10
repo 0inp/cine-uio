@@ -20,38 +20,64 @@ function dayOf(screening: Screening): string {
   return screening.datetime.split("T")[0];
 }
 
-export interface VisibleDay {
-  /** Set only when showing a day other than today, so the page can say so. */
-  displayDate: string | null;
-  screenings: Screening[];
+/** The venue key used everywhere: grouping, filtering and display all agree. */
+export function venueKeyOf(screening: Screening): string {
+  return `${screening.complex.company.name} - ${screening.complex.name}`;
 }
 
 /**
- * The day worth showing: today if anything is on, otherwise the nearest one ahead.
+ * The days worth offering: today and after, in order.
  *
- * Never a past date. Falling back to the earliest date in the payload would show
- * last week's showtimes whenever the scraper has not run in a while.
+ * Past days are excluded here rather than in the picker, so nothing downstream
+ * can offer one. A stale database would otherwise show last week's showtimes.
  */
-export function pickVisibleDay(
+export function availableDays(
   screenings: Screening[],
   today: string,
-): VisibleDay {
-  if (screenings.length === 0) return { displayDate: null, screenings: [] };
+): string[] {
+  const days = new Set<string>();
+  for (const screening of screenings) {
+    const day = dayOf(screening);
+    if (day >= today) days.add(day);
+  }
+  return Array.from(days).sort();
+}
 
-  const onDay = (day: string) => screenings.filter((s) => dayOf(s) === day);
+/** Today when something is on, otherwise the nearest day ahead, or nothing. */
+export function defaultDay(days: string[], today: string): string | null {
+  if (days.includes(today)) return today;
+  return days[0] ?? null;
+}
 
-  const forToday = onDay(today);
-  if (forToday.length > 0) return { displayDate: null, screenings: forToday };
+export interface Venue {
+  key: string;
+  label: string;
+}
 
-  // ISO day strings sort chronologically, so a plain sort finds the nearest one.
-  const upcoming = screenings
-    .map(dayOf)
-    .filter((day) => day > today)
-    .sort();
-  const earliest = upcoming[0];
-  if (!earliest) return { displayDate: null, screenings: [] };
+/** The venues actually showing something, so the filter never offers a dead end. */
+export function availableVenues(screenings: Screening[]): Venue[] {
+  const keys = new Set(screenings.map(venueKeyOf));
+  return Array.from(keys)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => ({ key, label: key }));
+}
 
-  return { displayDate: earliest, screenings: onDay(earliest) };
+export interface Filters {
+  day: string | null;
+  /** Empty means every venue: a filter nobody has touched excludes nothing. */
+  venueKeys: string[];
+}
+
+export function filterScreenings(
+  screenings: Screening[],
+  { day, venueKeys }: Filters,
+): Screening[] {
+  const wanted = new Set(venueKeys);
+  return screenings.filter(
+    (screening) =>
+      (day === null || dayOf(screening) === day) &&
+      (wanted.size === 0 || wanted.has(venueKeyOf(screening))),
+  );
 }
 
 /** Group showings by film, then by venue, ordered by the title the reader sees. */
@@ -60,7 +86,7 @@ export function groupByMovie(screenings: Screening[]): MovieGroup[] {
 
   for (const screening of screenings) {
     const key = movieKey(screening.movie);
-    const venueKey = `${screening.complex.company.name} - ${screening.complex.name}`;
+    const venueKey = venueKeyOf(screening);
 
     let group = groups.get(key);
     if (!group) {

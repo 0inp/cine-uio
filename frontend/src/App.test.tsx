@@ -519,3 +519,135 @@ describe("staleness banner", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe("day picker", () => {
+  const twoDays = [
+    { ...BASE_SCREENING, id: 1, datetime: `${today}T14:00:00` },
+    {
+      ...BASE_SCREENING,
+      id: 2,
+      datetime: `${tomorrow}T14:00:00`,
+      movie: { title: "Tomorrow Film" },
+    },
+  ];
+
+  it("stays hidden when there is only one day", async () => {
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("group", { name: "Día" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers each available day", async () => {
+    mockFetch(twoDays);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByRole("group", { name: "Día" })).toBeInTheDocument(),
+    );
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+  });
+
+  it("starts on today and shows only today", async () => {
+    mockFetch(twoDays);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Tomorrow Film")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hoy" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("switches to the day the reader picks", async () => {
+    mockFetch(twoDays);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+
+    const notToday = screen
+      .getAllByRole("button")
+      .find((b) => b.textContent !== "Hoy");
+    fireEvent.click(notToday as HTMLElement);
+
+    await waitFor(() =>
+      expect(screen.getByText("Tomorrow Film")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Toy Story 5")).not.toBeInTheDocument();
+  });
+});
+
+describe("venue filter", () => {
+  const twoVenues = [
+    { ...BASE_SCREENING, id: 1 },
+    {
+      ...BASE_SCREENING,
+      id: 2,
+      movie: { title: "Supercines Film" },
+      complex: {
+        ...BASE_COMPLEX,
+        name: "San Luis",
+        company: { name: "Supercines", base_url: "https://s" },
+      },
+    },
+  ];
+
+  it("stays hidden when there is only one venue", async () => {
+    mockFetch([BASE_SCREENING]);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Cines")).not.toBeInTheDocument();
+  });
+
+  it("shows every venue by default", async () => {
+    mockFetch(twoVenues);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("Supercines Film")).toBeInTheDocument();
+  });
+
+  it("keeps only the venues the reader checks", async () => {
+    mockFetch(twoVenues);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByLabelText("Supercines - San Luis"));
+
+    await waitFor(() =>
+      expect(screen.queryByText("Toy Story 5")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("Supercines Film")).toBeInTheDocument();
+  });
+
+  it("restores every venue when the filter is cleared", async () => {
+    mockFetch(twoVenues);
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByLabelText("Supercines - San Luis"));
+    await waitFor(() =>
+      expect(screen.queryByText("Toy Story 5")).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Ver todos" }));
+    await waitFor(() =>
+      expect(screen.getByText("Toy Story 5")).toBeInTheDocument(),
+    );
+  });
+});
